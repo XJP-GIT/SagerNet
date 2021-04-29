@@ -24,6 +24,7 @@ package io.nekohasekai.sagernet.fmt.shadowsocks
 import cn.hutool.core.codec.Base64
 import com.github.shadowsocks.plugin.PluginConfiguration
 import com.github.shadowsocks.plugin.PluginOptions
+import io.nekohasekai.sagernet.ktx.decodeBase64UrlSafe
 import io.nekohasekai.sagernet.ktx.unUrlSafe
 import io.nekohasekai.sagernet.ktx.urlSafe
 import okhttp3.HttpUrl
@@ -48,18 +49,32 @@ fun ShadowsocksBean.fixInvalidParams() {
         pl.pluginsOptions.remove(pl.selected)
         pl.selected = "v2ray-plugin"
 
-        // reslove v2ray plugin
+        // resolve v2ray plugin
 
     }
 
-    if (pl.selected == "obfs") {
+    if (pl.selected.contains("obfs") && pl.selected != "obfs-local") {
 
         pl.pluginsOptions["obfs-local"] = pl.getOptions().apply { id = "obfs-local" }
         pl.pluginsOptions.remove(pl.selected)
         pl.selected = "obfs-local"
 
-        // reslove clash obfs
+        // resolve clash obfs
 
+    }
+
+    if (pl.selected == "obfs-local") {
+        val options = pl.pluginsOptions["obfs-local"]
+        if (options != null) {
+            if (options.containsKey("mode")) {
+                options["obfs"] = options["mode"]
+                options.remove("mode")
+            }
+            if (options.containsKey("host")) {
+                options["obfs-host"] = options["host"]
+                options.remove("host")
+            }
+        }
     }
 
     plugin = pl.toString()
@@ -92,7 +107,7 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
 
         }
 
-        val methodAndPswd = Base64.decodeStr(link.username)
+        val methodAndPswd = link.username.decodeBase64UrlSafe()
 
         return ShadowsocksBean().apply {
 
@@ -116,7 +131,7 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
         if (v2Url.contains("#")) v2Url = v2Url.substringBefore("#")
 
         val link =
-            ("https://" + Base64.decodeStr(v2Url.substringAfter("ss://"))).toHttpUrlOrNull()
+            ("https://" + v2Url.substringAfter("ss://").decodeBase64UrlSafe()).toHttpUrlOrNull()
                 ?: error("invalid v2rayN link $url")
 
         return ShadowsocksBean().apply {
@@ -155,18 +170,6 @@ fun ShadowsocksBean.toUri(): String {
     }
 
     return builder.toString().replace("https://", "ss://")
-
-}
-
-fun ShadowsocksBean.toV2rayN(): String {
-
-    var url = "$method:$password@$serverAddress:$serverPort"
-    url = "ss://" + Base64.encodeUrlSafe(url)
-    if (name.isNotBlank()) {
-        url += "#" + name.urlSafe()
-    }
-
-    return url
 
 }
 

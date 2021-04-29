@@ -21,14 +21,29 @@
 
 package io.nekohasekai.sagernet.ktx
 
+import cn.hutool.core.codec.Base64
+import cn.hutool.json.JSONObject
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.fmt.gson.gson
 import io.nekohasekai.sagernet.fmt.http.parseHttp
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.shadowsocksr.parseShadowsocksR
 import io.nekohasekai.sagernet.fmt.socks.parseSOCKS
 import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
-import io.nekohasekai.sagernet.fmt.v2ray.parseVmess
+import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
 import java.util.*
+
+fun formatObject(obj: Any): String {
+    return gson.toJson(obj).let { JSONObject(it).toStringPretty() }
+}
+
+fun String.decodeBase64UrlSafe(): String {
+    return Base64.decodeStr(
+        replace(' ', '-')
+            .replace('/', '_')
+            .replace('+', '-')
+            .replace("=", ""))
+}
 
 fun parseProxies(text: String): List<AbstractBean> {
     val links = text.split('\n').flatMap { it.trim().split(' ') }
@@ -41,17 +56,17 @@ fun parseProxies(text: String): List<AbstractBean> {
             }.onFailure {
                 Logs.w(it)
             }
-        } else if (link.matches("(http|https|native\\+https)://.*".toRegex())) {
+        } else if (link.matches("(http|https|naive\\+https)://.*".toRegex())) {
             Logs.d("Try parse http link: $link")
             runCatching {
                 entities.add(parseHttp(link))
             }.onFailure {
                 Logs.w(it)
             }
-        } else if (link.startsWith("vmess://") || link.startsWith("vmess1://")) {
-            Logs.d("Try parse vmess link: $link")
+        } else if (link.startsWith("vmess://") || link.startsWith("vless://")) {
+            Logs.d("Try parse v2ray link: $link")
             runCatching {
-                entities.add(parseVmess(link))
+                entities.add(parseV2Ray(link))
             }.onFailure {
                 Logs.w(it)
             }

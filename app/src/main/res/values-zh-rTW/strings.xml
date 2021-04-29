@@ -63,7 +63,7 @@
     <string name="domestic_dns">國內 DNS</string>
     <string name="cag_route">路由設定</string>
     <string name="remote_dns">遠端 DNS</string>
-    <string name="force_ss_rust">不使用 v2ray 路由 shadowsocks</string>
+    <string name="force_ss_rust">不使用 V2Ray 路由 Shadowsocks</string>
     <string name="force_ss_sum">強制所有 Shadowsocks 設定檔使用和 Shadowsocks Android 相同的 shadowsocks-rust 後端。</string>
     <string name="inbound_settings">傳入設定</string>
     <string name="general_settings">應用程式設定</string>
@@ -100,10 +100,9 @@
     <string name="obfs_param">混淆參數</string>
     <string name="uuid">使用者 ID</string>
     <string name="alter_id">替代 ID</string>
-    <string name="security">安全</string>
     <string name="network">網路</string>
     <string name="header_type">標頭類型</string>
-    <string name="request_host">請求主機 / QUIC 安全</string>
+    <string name="request_host">請求主機</string>
     <string name="path">Path / Key / Seed / ServiceName</string>
     <string name="tls">使用 TLS</string>
     <string name="sni">伺服器名稱指示</string>
@@ -117,11 +116,7 @@
 
     <string name="metered">計量付費提示</string>
     <string name="metered_summary">提示系統將 VPN 視為計量付費。</string>
-    <string name="route_list">路由</string>
-    <string name="route_entry_all">全域</string>
-    <string name="route_entry_bypass_lan">略過區域網路</string>
-    <string name="route_entry_bypass_chn">略過中國大陸</string>
-    <string name="route_entry_bypass_lan_chn">略過區域網路和中國大陸</string>
+    <string name="menu_route">路由</string>
     <string name="proxied_apps">應用程式 VPN 模式</string>
     <string name="proxied_apps_summary">為被選取的應用程式設定 VPN 模式。</string>
     <string name="on">啟用</string>

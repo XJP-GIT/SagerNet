@@ -21,10 +21,14 @@
 
 package io.nekohasekai.sagernet.bg
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import cn.hutool.json.JSONObject
 import com.github.shadowsocks.plugin.PluginConfiguration
 import com.github.shadowsocks.plugin.PluginManager
@@ -35,18 +39,23 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.gson.gson
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean
-import io.nekohasekai.sagernet.fmt.v2ray.AbstractV2RayBean
+import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.V2RayConfig
 import io.nekohasekai.sagernet.fmt.v2ray.buildV2RayConfig
 import io.nekohasekai.sagernet.ktx.Logs
+import io.nekohasekai.sagernet.ktx.onMainDispatcher
+import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.utils.DirectBoot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import libv2ray.Libv2ray
 import libv2ray.V2RayPoint
 import libv2ray.V2RayVPNServiceSupportsSet
 import java.io.File
 import java.io.IOException
 import java.util.*
+
 
 class ProxyInstance(val profile: ProxyEntity) {
 
@@ -90,6 +99,11 @@ class ProxyInstance(val profile: ProxyEntity) {
                 it["local_udp_address"] = "127.0.0.1"
                 it["local_udp_port"] = port
                 it["mode"] = "tcp_and_udp"
+                if (DataStore.enableLocalDNS) {
+                    it["dns"] = "127.0.0.1:${DataStore.localDNSPort}"
+                } else {
+                    it["dns"] = DataStore.remoteDNS
+                }
 
                 if (DataStore.ipv6Route && DataStore.preferIpv6) {
                     it["ipv6_first"] = true
@@ -137,6 +151,11 @@ class ProxyInstance(val profile: ProxyEntity) {
                 it["obfs"] = bean.obfs
                 it["obfs_param"] = bean.obfsParam
                 it["ipv6"] = DataStore.ipv6Route
+                if (DataStore.enableLocalDNS) {
+                    it["dns"] = "127.0.0.1:${DataStore.localDNSPort}"
+                } else {
+                    it["dns"] = DataStore.remoteDNS
+                }
             }
 
             Logs.d(proxyConfig.toStringPretty())
@@ -160,31 +179,53 @@ class ProxyInstance(val profile: ProxyEntity) {
             )
 
             base.data.processes!!.start(commands)
-        } else if (bean is AbstractV2RayBean) {
-            if (bean.network == "ws" && DataStore.wsBrowserForwarding) {
-                wsForwarder = WebView(base as Context)
-                wsForwarder.loadUrl("http://127.0.0.1:" + DataStore.socksPort + 11)
-            }
         }
 
         v2rayPoint.runLoop(DataStore.preferIpv6)
+        runOnDefaultDispatcher {
+            val url = "http://127.0.0.1:" + (DataStore.socksPort + 11) + "/"
+            if (bean is StandardV2RayBean) {
+                if (bean.type == "ws" && bean.wsUseBrowserForwarder) {
+                    onMainDispatcher {
+                        wsForwarder = WebView(base as Context)
+                        @SuppressLint("SetJavaScriptEnabled")
+                        wsForwarder.settings.javaScriptEnabled = true
+                        wsForwarder.webViewClient = object : WebViewClient() {
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                error: WebResourceError?,
+                            ) {
+                                Logs.d("WebView load failed: $error")
+
+                                runOnMainDispatcher {
+                                    wsForwarder.loadUrl("about:blank")
+
+                                    delay(1000L)
+                                    wsForwarder.loadUrl(url)
+                                }
+                            }
+
+                            override fun onPageFinished(view: WebView, url: String) {
+                                super.onPageFinished(view, url)
+
+                                Logs.d("WebView loaded: ${view.title}")
+
+                            }
+                        }
+                        wsForwarder.loadUrl(url)
+                    }
+                }
+            }
+        }
     }
 
     fun stop() {
         v2rayPoint.stopLoop()
 
         if (::wsForwarder.isInitialized) {
-            wsForwarder.clearView()
+            wsForwarder.loadUrl("about:blank")
             wsForwarder.destroy()
-        }
-    }
-
-    fun printStats() {
-        val tags = config.outbounds.map { outbound -> outbound.tag.takeIf { !it.isNullOrBlank() } }
-        for (tag in tags) {
-            val uplink = v2rayPoint.queryStats(tag, "uplink")
-            val downlink = v2rayPoint.queryStats(tag, "downlink")
-            println("$tag >> uplink $uplink / downlink $downlink")
         }
     }
 

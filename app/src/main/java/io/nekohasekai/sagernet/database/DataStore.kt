@@ -25,7 +25,6 @@ import android.os.Binder
 import android.os.Build
 import androidx.preference.PreferenceDataStore
 import io.nekohasekai.sagernet.Key
-import io.nekohasekai.sagernet.RouteMode
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
@@ -67,12 +66,20 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
 
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
-    var routeMode by configurationStore.string(Key.ROUTE_MODE) { RouteMode.ALL }
+
+    var domainStrategy by configurationStore.string(Key.PROFILE_NAME) { "AsIs" }
+    var domainMatcher by configurationStore.string(Key.DOMAIN_MATCHER) { "mph" }
+    var trafficSniffing by configurationStore.boolean(Key.TRAFFIC_SNIFFING) { true }
+
+    var bypassLan by configurationStore.boolean(Key.BYPASS_LAN) { true }
+    var routeChina by configurationStore.stringToInt(Key.ROUTE_CHINA)
+    var blockAds by configurationStore.boolean(Key.BLOCK_ADS) { false }
+
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
     var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)
 
     var enableLocalDNS by configurationStore.boolean(Key.ENABLE_LOCAL_DNS) { true }
-    var remoteDNS by configurationStore.string(Key.REMOTE_DNS) { "1.1.1.1" }
+    var remoteDNS by configurationStore.string(Key.REMOTE_DNS) { "https://1.1.1.1/dns-query" }
     var domesticDns by configurationStore.string(Key.DOMESTIC_DNS) { "9.9.9.11" }
 
     // hopefully hashCode = mHandle doesn't change, currently this is true from KitKat to Nougat
@@ -90,7 +97,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         set(value) = saveLocalPort(Key.HTTP_PORT, value)
 
     fun initGlobal() {
-        persistAcrossReboot
         if (configurationStore.getString(Key.SOCKS_PORT) == null) socksPort = socksPort
         if (configurationStore.getString(Key.LOCAL_DNS_PORT) == null) localDNSPort = localDNSPort
         if (configurationStore.getString(Key.HTTP_PORT) == null) httpPort = httpPort
@@ -113,8 +119,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var individual by configurationStore.string("individual")
     var forceShadowsocksRust by configurationStore.boolean(Key.FORCE_SHADOWSOCKS_RUST)
     var requireHttp by configurationStore.boolean(Key.REQUIRE_HTTP)
-    var wsMaxEarlyData by configurationStore.stringToInt(Key.WS_MAX_EARLY_DATA) { 0 }
-    var wsBrowserForwarding by configurationStore.boolean(Key.WS_BROWSER_FORWARDING) { false }
+    var enableMux by configurationStore.boolean(Key.ENABLE_MUX)
+    var muxConcurrency by configurationStore.stringToInt(Key.MUX_CONCURRENCY) { 8 }
 
     val persistAcrossReboot by configurationStore.boolean(Key.PERSIST_ACROSS_REBOOT) { true }
     val canToggleLocked: Boolean get() = configurationStore.getBoolean(Key.DIRECT_BOOT_AWARE) == true
@@ -149,6 +155,10 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serverSNI by profileCacheStore.string(Key.SERVER_SNI)
     var serverTLS by profileCacheStore.boolean(Key.SERVER_TLS)
     var serverEncryption by profileCacheStore.string(Key.SERVER_ENCRYPTION)
+    var serverALPN by configurationStore.string(Key.SERVER_ALPN)
+    var serverQuicSecurity by configurationStore.string(Key.SERVER_QUIC_SECURITY)
+    var serverWsMaxEarlyData by configurationStore.stringToInt(Key.SERVER_WS_MAX_EARLY_DATA)
+    var serverWsBrowserForwarding by configurationStore.boolean(Key.SERVER_WS_BROWSER_FORWARDING)
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {

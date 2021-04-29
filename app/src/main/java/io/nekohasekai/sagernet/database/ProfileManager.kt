@@ -22,7 +22,6 @@
 package io.nekohasekai.sagernet.database
 
 import android.database.sqlite.SQLiteCantOpenDatabaseException
-import android.util.Base64
 import com.github.shadowsocks.plugin.PluginOptions
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.aidl.TrafficStats
@@ -37,9 +36,9 @@ import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
+import io.nekohasekai.sagernet.ktx.decodeBase64UrlSafe
 import io.nekohasekai.sagernet.ktx.parseProxies
 import io.nekohasekai.sagernet.utils.DirectBoot
-import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -227,40 +226,17 @@ object ProfileManager {
 
     suspend fun deleteGroup(vararg group: ProxyGroup) {
         SagerDatabase.groupDao.deleteGroup(* group)
+        SagerDatabase.proxyDao.deleteByGroup(* group.map { it.id }.toLongArray())
         for (proxyGroup in group) {
             groupIterator { onRemoved(proxyGroup.id) }
         }
     }
 
-
-    suspend fun createGroup(response: Response) {
-        /* val proxies =
-         if (proxies.isEmpty()) error(SagerNet.application.getString(R.string.no_proxies_found))
-
-         val newGroup = ProxyGroup(
-             name = "New group",
-             isSubscription = true,
-             subscriptionLinks = mutableListOf(response.request.url.toString()),
-             lastUpdate = SystemClock.elapsedRealtimeNanos(),
-         )
-
-         newGroup.id = SagerDatabase.groupDao.createGroup(newGroup)
-
-         groupIterator { onAdd(newGroup) }
-
-         for (proxy in proxies) {
-             createProfile(newGroup.id, proxy)
-         }
-
-         groupIterator { onAddFinish(proxies.size) }*/
-    }
-
-
     @Suppress("UNCHECKED_CAST")
     fun parseSubscription(text: String, tryDecode: Boolean = true): Pair<Int, List<AbstractBean>> {
         if (tryDecode) {
             try {
-                return parseSubscription(String(Base64.decode(text, Base64.NO_PADDING)), false)
+                return parseSubscription(text.decodeBase64UrlSafe(), false)
             } catch (ignored: Exception) {
             }
         }
@@ -347,25 +323,31 @@ object ProfileManager {
                                 "uuid" -> bean.uuid = opt.value as String
                                 "alterId" -> bean.alterId = opt.value.toString().toInt()
                                 "cipher" -> bean.security = opt.value as String
-                                "network" -> bean.network = opt.value as String
-                                "tls" -> bean.tls = opt.value?.toString() == "true"
+                                "network" -> bean.type = opt.value as String
+                                "tls" -> bean.security =
+                                    if (opt.value?.toString() == "true") "tls" else ""
                                 "ws-path" -> bean.path = opt.value as String
-                                "servername" -> bean.requestHost = opt.value as String
+                                "ws-headers" -> for (wsOpt in (opt.value as Map<String, Any>)) {
+                                    when (wsOpt.key.toLowerCase()) {
+                                        "host" -> bean.host = wsOpt.value as String
+                                    }
+                                }
+                                "servername" -> bean.host = opt.value as String
                                 "h2-opts" -> for (h2Opt in (opt.value as Map<String, Any>)) {
-                                    when (h2Opt.key) {
-                                        "host" -> bean.requestHost =
+                                    when (h2Opt.key.toLowerCase()) {
+                                        "host" -> bean.host =
                                             (h2Opt.value as List<String>).first()
                                         "path" -> bean.path = h2Opt.value as String
                                     }
                                 }
                                 "http-opts" -> for (httpOpt in (opt.value as Map<String, Any>)) {
-                                    when (httpOpt.key) {
+                                    when (httpOpt.key.toLowerCase()) {
                                         "path" -> bean.path =
                                             (httpOpt.value as List<String>).first()
                                     }
                                 }
                                 "grpc-opts" -> for (grpcOpt in (opt.value as Map<String, Any>)) {
-                                    when (grpcOpt.key) {
+                                    when (grpcOpt.key.toLowerCase()) {
                                         "grpc-service-name" -> bean.path = grpcOpt.value as String
                                     }
                                 }

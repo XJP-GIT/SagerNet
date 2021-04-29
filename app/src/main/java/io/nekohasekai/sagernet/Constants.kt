@@ -47,15 +47,22 @@ object Key {
     const val BYPASS_MODE = "bypassMode"
     const val METERED_NETWORK = "meteredNetwork"
 
-    const val ROUTE_MODE = "routeMode"
+    const val DOMAIN_STRATEGY = "domainStrategy"
+    const val DOMAIN_MATCHER = "domainMatcher"
+    const val TRAFFIC_SNIFFING = "trafficSniffing"
+    const val BYPASS_LAN = "bypassLan"
+    const val ROUTE_CHINA = "routeChina"
+    const val BLOCK_ADS = "blockAds"
+
     const val SOCKS_PORT = "socksPort"
     const val FORCE_SHADOWSOCKS_RUST = "forceShadowsocksRust"
     const val REQUIRE_HTTP = "requireHttp"
     const val HTTP_PORT = "httpPort"
     const val ALLOW_ACCESS = "allowAccess"
     const val SPEED_INTERVAL = "speedInterval"
-    const val WS_MAX_EARLY_DATA = "wsMaxEarlyData"
-    const val WS_BROWSER_FORWARDING = "wsBrowserForwarding"
+
+    const val ENABLE_MUX = "enableMux"
+    const val MUX_CONCURRENCY = "muxConcurrency"
 
     const val PROFILE_DIRTY = "profileDirty"
     const val PROFILE_ID = "profileId"
@@ -71,13 +78,11 @@ object Key {
     const val SERVER_PLUGIN = "serverPlugin"
     const val SERVER_PLUGIN_CONFIGURE = "serverPluginConfigure"
 
-    // ssr
     const val SERVER_PROTOCOL = "serverProtocol"
     const val SERVER_PROTOCOL_PARAM = "serverProtocolParam"
     const val SERVER_OBFS = "serverObfs"
     const val SERVER_OBFS_PARAM = "serverObfsParam"
 
-    //vmess
     const val SERVER_USER_ID = "serverUserId"
     const val SERVER_ALTER_ID = "serverAlterId"
     const val SERVER_SECURITY = "serverSecurity"
@@ -87,17 +92,13 @@ object Key {
     const val SERVER_PATH = "serverPath"
     const val SERVER_SNI = "serverSNI"
     const val SERVER_TLS = "serverTLS"
-
-    // vless
     const val SERVER_ENCRYPTION = "serverEncryption"
+    const val SERVER_ALPN = "serverALPN"
+    const val SERVER_QUIC_SECURITY = "serverQuicSecurity"
+    const val SERVER_WS_MAX_EARLY_DATA = "serverWsMaxEarlyData"
+    const val SERVER_WS_BROWSER_FORWARDING = "serverWsBrowserForwarding"
+    const val SERVER_WS_CATEGORY = "serverWsCategory"
 
-}
-
-object RouteMode {
-    const val ALL = "all"
-    const val BYPASS_LAN = "bypass-lan"
-    const val BYPASS_CHINA = "bypass-china"
-    const val BYPASS_LAN_CHINA = "bypass-lan-china"
 }
 
 object Action {

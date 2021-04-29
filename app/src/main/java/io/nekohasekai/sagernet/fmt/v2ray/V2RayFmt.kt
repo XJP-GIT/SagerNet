@@ -24,7 +24,6 @@ package io.nekohasekai.sagernet.fmt.v2ray
 import cn.hutool.core.codec.Base64
 import cn.hutool.json.JSONObject
 import io.nekohasekai.sagernet.BuildConfig
-import io.nekohasekai.sagernet.RouteMode
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.http.HttpBean
@@ -32,6 +31,9 @@ import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.v2ray.V2RayConfig.*
+import io.nekohasekai.sagernet.ktx.Logs
+import io.nekohasekai.sagernet.ktx.decodeBase64UrlSafe
+import io.nekohasekai.sagernet.ktx.formatObject
 import io.nekohasekai.sagernet.ktx.urlSafe
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -40,6 +42,8 @@ const val TAG_SOCKS = "in"
 const val TAG_HTTP = "http"
 const val TAG_AGENT = "out"
 const val TAG_DIRECT = "bypass"
+const val TAG_BLOCK = "block"
+
 const val TAG_DNS_IN = "dns-in"
 const val TAG_DNS_OUT = "dns-out"
 
@@ -49,7 +53,8 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
     val remoteDns = DataStore.remoteDNS.split(",")
     val domesticDns = DataStore.domesticDns.split(',')
     val enableLocalDNS = DataStore.enableLocalDNS
-    val routeMode = DataStore.routeMode
+    val routeChina = DataStore.routeChina
+    val trafficSniffing = DataStore.trafficSniffing
 
     val bean = proxy.requireBean()
 
@@ -67,19 +72,15 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                 }
             })
 
-            if (enableLocalDNS) {
-                when (routeMode) {
-                    RouteMode.BYPASS_CHINA, RouteMode.BYPASS_LAN_CHINA -> {
-                        servers.add(DnsObject.StringOrServerObject().apply {
-                            valueY = DnsObject.ServerObject().apply {
-                                address = domesticDns.first()
-                                port = 53
-                                domains = listOf("geosite:cn")
-                                expectIPs = listOf("geoip:cn")
-                            }
-                        })
+            if (routeChina == 1) {
+                servers.add(DnsObject.StringOrServerObject().apply {
+                    valueY = DnsObject.ServerObject().apply {
+                        address = domesticDns.first()
+                        port = 53
+                        domains = listOf("geosite:cn")
+                        expectIPs = listOf("geoip:cn")
                     }
-                }
+                })
             }
         }
 
@@ -113,6 +114,13 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                         udp = true
                         userLevel = 8
                     })
+                if (trafficSniffing) {
+                    sniffing = InboundObject.SniffingObject().apply {
+                        enabled = true
+                        destOverride = listOf("http", "tls")
+                        metadataOnly = false
+                    }
+                }
             }
         )
 
@@ -129,6 +137,13 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                         allowTransparent = true
                         userLevel = 8
                     })
+                if (trafficSniffing) {
+                    sniffing = InboundObject.SniffingObject().apply {
+                        enabled = true
+                        destOverride = listOf("http", "tls")
+                        metadataOnly = false
+                    }
+                }
             }
         }
 
@@ -157,7 +172,8 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                         })
                     if (bean.tls) {
                         streamSettings = StreamSettingsObject().apply {
-                            network = "tls"
+                            network = "tcp"
+                            security = "tls"
                             if (bean.sni.isNotBlank()) {
                                 tlsSettings = TLSObject().apply {
                                     serverName = bean.sni
@@ -186,7 +202,8 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                         })
                     if (bean.tls) {
                         streamSettings = StreamSettingsObject().apply {
-                            network = "tls"
+                            network = "tcp"
+                            security = "tls"
                             if (bean.sni.isNotBlank()) {
                                 tlsSettings = TLSObject().apply {
                                     serverName = bean.sni
@@ -194,7 +211,7 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                             }
                         }
                     }
-                } else if (bean is AbstractV2RayBean) {
+                } else if (bean is StandardV2RayBean) {
                     if (bean is VMessBean) {
                         protocol = "vmess"
                         settings = LazyOutboundConfigurationObject(
@@ -239,12 +256,15 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                     }
 
                     streamSettings = StreamSettingsObject().apply {
-                        network = bean.network
-                        security = if (bean.tls) "tls" else ""
-                        if (bean.tls) {
+                        network = bean.type
+                        security = bean.security
+                        if (security == "tls") {
                             tlsSettings = TLSObject().apply {
-                                if (bean.sni.isNotBlank()) {
-                                    serverName = bean.sni
+                                if (bean.tlsSni.isNotBlank()) {
+                                    serverName = bean.tlsSni
+                                }
+                                if (bean.tlsAlpn.isNotBlank()) {
+                                    alpn = bean.tlsAlpn.split(",")
                                 }
                             }
                         }
@@ -255,13 +275,13 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                                     if (bean.headerType == "http") {
                                         header = TcpObject.HeaderObject().apply {
                                             type = "http"
-                                            if (bean.requestHost.isNotBlank() || bean.path.isNotBlank()) {
+                                            if (bean.host.isNotBlank() || bean.path.isNotBlank()) {
                                                 request = TcpObject.HeaderObject.HTTPRequestObject()
                                                     .apply {
                                                         headers = mutableMapOf()
-                                                        if (bean.requestHost.isNotBlank()) {
+                                                        if (bean.host.isNotBlank()) {
                                                             headers["Host"] =
-                                                                bean.requestHost.split(",")
+                                                                bean.host.split(",")
                                                                     .map { it.trim() }
                                                         }
                                                         if (bean.path.isNotBlank()) {
@@ -294,18 +314,17 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                                 wsSettings = WebSocketObject().apply {
                                     headers = mutableMapOf()
 
-                                    if (bean.requestHost.isNotBlank()) {
-                                        headers["Host"] = bean.requestHost
+                                    if (bean.host.isNotBlank()) {
+                                        headers["Host"] = bean.host
                                     }
 
                                     path = bean.path.takeIf { it.isNotBlank() } ?: "/"
 
-                                    val wsMaxEarlyData = DataStore.wsMaxEarlyData
-                                    if (wsMaxEarlyData != 0) {
-                                        maxEarlyData = wsMaxEarlyData
+                                    if (bean.wsMaxEarlyData > 0) {
+                                        maxEarlyData = bean.wsMaxEarlyData
                                     }
 
-                                    if (DataStore.wsBrowserForwarding) {
+                                    if (bean.wsUseBrowserForwarder) {
                                         useBrowserForwarding = true
 
                                         browserForwarder = BrowserForwarderObject().apply {
@@ -319,8 +338,8 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                                 network = "h2"
 
                                 httpSettings = HttpObject().apply {
-                                    if (bean.requestHost.isNotBlank()) {
-                                        host = bean.requestHost.split(",")
+                                    if (bean.host.isNotBlank()) {
+                                        host = bean.host.split(",")
                                     }
 
                                     path = bean.path.takeIf { it.isNotBlank() } ?: "/"
@@ -328,7 +347,7 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                             }
                             "quic" -> {
                                 quicSettings = QuicObject().apply {
-                                    security = bean.requestHost.takeIf { it.isNotBlank() } ?: "none"
+                                    security = bean.host.takeIf { it.isNotBlank() } ?: "none"
                                     key = bean.path
                                     header = QuicObject.HeaderObject().apply {
                                         type = bean.headerType.takeIf { it.isNotBlank() } ?: "none"
@@ -405,8 +424,15 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                             )
                         })
                 }
+                if (DataStore.enableMux) {
+                    mux = OutboundObject.MuxObject().apply {
+                        enabled = true
+                        concurrency = DataStore.muxConcurrency
+                    }
+                }
             }
         )
+
         outbounds.add(
             OutboundObject().apply {
                 tag = TAG_DIRECT
@@ -414,69 +440,90 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
             }
         )
 
+        outbounds.add(
+            OutboundObject().apply {
+                tag = TAG_BLOCK
+                protocol = "blackhole"
+
+                settings = LazyOutboundConfigurationObject(
+                    BlackholeOutboundConfigurationObject().apply {
+                        response = BlackholeOutboundConfigurationObject.ResponseObject().apply {
+                            type = "http"
+                        }
+                    }
+                )
+            }
+        )
+
         routing = RoutingObject().apply {
-            domainStrategy = "IPIfNonMatch"
+            domainStrategy = DataStore.domainStrategy
+            domainMatcher = DataStore.domainMatcher
 
             rules = mutableListOf()
+
+            if (bean is StandardV2RayBean && bean.type == "ws" && bean.wsUseBrowserForwarder == true) {
+                rules.add(RoutingObject.RuleObject().apply {
+                    type = "field"
+                    outboundTag = TAG_DIRECT
+                    Logs.d(formatObject(bean))
+                    when {
+                        bean.host.isNotBlank() -> domain = listOf(bean.host)
+                        bean.serverAddress!!.contains("[a-zA-Z]".toRegex()) -> {
+                            domain = listOf(bean.serverAddress)
+                        }
+                        else -> ip = listOf(bean.serverAddress)
+                    }
+                })
+            }
+
+            if (DataStore.bypassLan) {
+                rules.add(RoutingObject.RuleObject().apply {
+                    type = "field"
+                    outboundTag = TAG_DIRECT
+                    ip = listOf("geoip:private")
+                })
+            }
+
+            if (DataStore.blockAds) {
+                rules.add(RoutingObject.RuleObject().apply {
+                    type = "field"
+                    outboundTag = TAG_BLOCK
+                    domain = listOf("geosite:category-ads-all")
+                })
+            }
+
+            if (routeChina > 0) {
+                rules.add(RoutingObject.RuleObject().apply {
+                    type = "field"
+                    outboundTag = if (routeChina == 1) TAG_DIRECT else TAG_BLOCK
+                    ip = listOf("geoip:cn")
+                })
+                rules.add(RoutingObject.RuleObject().apply {
+                    type = "field"
+                    outboundTag = if (routeChina == 1) TAG_DIRECT else TAG_BLOCK
+                    domain = listOf("geosite:cn")
+                })
+            }
+
+            rules.add(RoutingObject.RuleObject().apply {
+                inboundTag = mutableListOf(TAG_SOCKS)
+
+                if (requireHttp) {
+                    inboundTag.add(TAG_HTTP)
+                }
+
+                outboundTag = TAG_AGENT
+                type = "field"
+            })
 
             rules.add(RoutingObject.RuleObject().apply {
                 type = "field"
                 outboundTag = TAG_AGENT
                 domain = listOf("domain:googleapis.cn")
             })
-
-            when (DataStore.routeMode) {
-                RouteMode.BYPASS_LAN -> {
-                    rules.add(RoutingObject.RuleObject().apply {
-                        type = "field"
-                        outboundTag = TAG_DIRECT
-                        ip = listOf("geoip:private")
-                    })
-                }
-                RouteMode.BYPASS_CHINA -> {
-                    rules.add(RoutingObject.RuleObject().apply {
-                        type = "field"
-                        outboundTag = TAG_DIRECT
-                        ip = listOf("geoip:cn")
-                    })
-                    rules.add(RoutingObject.RuleObject().apply {
-                        type = "field"
-                        outboundTag = TAG_DIRECT
-                        domain = listOf("geosite:cn")
-                    })
-                }
-                RouteMode.BYPASS_LAN_CHINA -> {
-                    rules.add(RoutingObject.RuleObject().apply {
-                        type = "field"
-                        outboundTag = TAG_DIRECT
-                        ip = listOf("geoip:private")
-                    })
-                    rules.add(RoutingObject.RuleObject().apply {
-                        type = "field"
-                        outboundTag = TAG_DIRECT
-                        ip = listOf("geoip:cn")
-                    })
-                    rules.add(RoutingObject.RuleObject().apply {
-                        type = "field"
-                        outboundTag = TAG_DIRECT
-                        domain = listOf("geosite:cn")
-                    })
-                }
-            }
-
-            /* rules.add(RoutingObject.RuleObject().apply {
-                 inboundTag = mutableListOf(TAG_SOCKS)
-
-                 if (requireHttp) {
-                     inboundTag.add(TAG_HTTP)
-                 }
-
-                 outboundTag = TAG_AGENT
-                 type = "field"
-             })*/
         }
 
-        if (DataStore.enableLocalDNS) {
+        if (enableLocalDNS) {
             inbounds.add(
                 InboundObject().apply {
                     tag = TAG_DNS_IN
@@ -499,8 +546,15 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                 OutboundObject().apply {
                     protocol = "dns"
                     tag = TAG_DNS_OUT
+                    settings = LazyOutboundConfigurationObject(
+                        DNSOutboundConfigurationObject().apply {
+                            network = "tcp"
+                        }
+                    )
+                    proxySettings
                 }
             )
+
             if (!domesticDns.first().startsWith("https")) {
                 routing.rules.add(0, RoutingObject.RuleObject().apply {
                     type = "field"
@@ -517,10 +571,11 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
                     port = "53"
                 })
             }
+
             routing.rules.add(0, RoutingObject.RuleObject().apply {
+                type = "field"
                 inboundTag = listOf(TAG_DNS_IN)
                 outboundTag = TAG_DNS_OUT
-                type = "field"
             })
         }
 
@@ -530,9 +585,165 @@ fun buildV2RayConfig(proxy: ProxyEntity): V2RayConfig {
 
 }
 
-fun parseVmess(link: String): VMessBean {
-    if (link.contains("?") || link.startsWith("vmess1://")) return parseVmess1(link)
-    val result = Base64.decodeStr(link.substringAfter("vmess://"))
+fun parseV2Ray(link: String): StandardV2RayBean {
+    if (!link.contains("@")) return parseV2RayN(link)
+
+    val bean = if (!link.startsWith("vless://")) {
+        VMessBean()
+    } else {
+        VLESSBean()
+    }
+    val url = link.replace("vmess://", "https://")
+        .replace("vless://", "https://")
+        .toHttpUrl()
+
+    bean.serverAddress = url.host
+    bean.serverPort = url.port
+    bean.name = url.fragment
+
+    if (url.password.isNotBlank()) {
+        // https://github.com/v2fly/v2fly-github-io/issues/26
+        (bean as VMessBean?) ?: error("Invalid vless url: $link")
+
+        var protocol = url.username
+        bean.type = protocol
+        bean.alterId = url.password.substringAfterLast('-').toInt()
+        bean.uuid = url.password.substringBeforeLast('-')
+
+        if (protocol.endsWith("+tls")) {
+            bean.security = "tls"
+            protocol = protocol.substring(0, protocol.length - 4)
+
+            url.queryParameter("tlsServerName")?.let {
+                if (it.isNotBlank()) {
+                    bean.tlsSni = it
+                }
+            }
+        }
+
+        when (protocol) {
+            "tcp" -> {
+                url.queryParameter("type")?.let {
+                    if (it == "http") {
+                        bean.headerType = "http"
+                        url.queryParameter("host")?.let {
+                            bean.host = it
+                        }
+                    }
+                }
+            }
+            "http" -> {
+                url.queryParameter("path")?.let {
+                    bean.path = it
+                }
+                url.queryParameter("host")?.let {
+                    bean.host = it.split("|").joinToString(",")
+                }
+            }
+            "ws" -> {
+                url.queryParameter("path")?.let {
+                    bean.path = it
+                }
+                url.queryParameter("host")?.let {
+                    bean.host = it
+                }
+            }
+            "kcp" -> {
+                url.queryParameter("type")?.let {
+                    bean.headerType = it
+                }
+                url.queryParameter("seed")?.let {
+                    bean.mKcpSeed = it
+                }
+            }
+            "quic" -> {
+                url.queryParameter("security")?.let {
+                    bean.quicSecurity = it
+                }
+                url.queryParameter("key")?.let {
+                    bean.quicKey = it
+                }
+                url.queryParameter("type")?.let {
+                    bean.headerType = it
+                }
+            }
+        }
+    } else {
+        // https://github.com/XTLS/Xray-core/issues/91
+
+        bean.uuid = url.username
+        if (url.pathSegments.size > 1 || url.pathSegments[0].isNotBlank()) {
+            bean.path = url.pathSegments.joinToString("/")
+        }
+
+        val protocol = url.queryParameter("type") ?: error("Missing type parameter")
+        bean.type = protocol
+
+        when (url.queryParameter("security")) {
+            "tls" -> {
+                bean.security = "tls"
+                url.queryParameter("sni")?.let {
+                    bean.tlsSni = it
+                }
+                url.queryParameter("alpn")?.let {
+                    bean.tlsAlpn = it
+                }
+            }
+        }
+        when (protocol) {
+            "tcp" -> {
+                url.queryParameter("headerType")?.let { headerType ->
+                    if (headerType == "http") {
+                        bean.headerType = headerType
+                        url.queryParameter("host")?.let {
+                            bean.host = it
+                        }
+                        url.queryParameter("path")?.let {
+                            bean.path = it
+                        }
+                    }
+                }
+            }
+            "kcp" -> {
+                url.queryParameter("headerType")?.let {
+                    bean.headerType = it
+                }
+                url.queryParameter("seed")?.let {
+                    bean.mKcpSeed = it
+                }
+            }
+            "ws", "http" -> {
+                url.queryParameter("host")?.let {
+                    bean.host = it
+                }
+                url.queryParameter("path")?.let {
+                    bean.path = it
+                }
+            }
+            "quic" -> {
+                url.queryParameter("headerType")?.let {
+                    bean.headerType = it
+                }
+                url.queryParameter("quicSecurity")?.let { quicSecurity ->
+                    bean.quicSecurity = quicSecurity
+                    url.queryParameter("key")?.let {
+                        bean.quicKey = it
+                    }
+                }
+            }
+            "grpc" -> {
+                url.queryParameter("serviceName")?.let {
+                    bean.grpcServiceName = it
+                }
+            }
+        }
+    }
+
+    return bean
+}
+
+fun parseV2RayN(link: String): VMessBean {
+    val result = link.substringAfter("vmess://").decodeBase64UrlSafe()
     if (result.contains("= vmess")) {
         return parseCsvVMess(result)
     }
@@ -544,20 +755,20 @@ fun parseVmess(link: String): VMessBean {
     bean.security = json.getStr("scy")
     bean.uuid = json.getStr("id")
     bean.alterId = json.getInt("aid")
-    bean.network = json.getStr("net")
+    bean.type = json.getStr("net")
     bean.headerType = json.getStr("type")
-    bean.requestHost = json.getStr("host")
+    bean.host = json.getStr("host")
     bean.path = json.getStr("path")
     bean.name = json.getStr("ps")
-    bean.sni = json.getStr("sni")
-    bean.tls = !json.getStr("tls").isNullOrBlank()
+    bean.tlsSni = json.getStr("sni")
+    bean.security = if (json.getStr("tls") == "true") "tls" else ""
 
     if (json.getInt("v", 2) < 2) {
-        when (bean.network) {
+        when (bean.type) {
             "ws" -> {
                 var path = ""
                 var host = ""
-                val lstParameter = bean.requestHost.split(";")
+                val lstParameter = bean.host.split(";")
                 if (lstParameter.isNotEmpty()) {
                     path = lstParameter[0].trim()
                 }
@@ -566,12 +777,12 @@ fun parseVmess(link: String): VMessBean {
                     host = lstParameter[1].trim()
                 }
                 bean.path = path
-                bean.requestHost = host
+                bean.host = host
             }
             "h2" -> {
                 var path = ""
                 var host = ""
-                val lstParameter = bean.requestHost.split(";")
+                val lstParameter = bean.host.split(";")
                 if (lstParameter.isNotEmpty()) {
                     path = lstParameter[0].trim()
                 }
@@ -580,7 +791,7 @@ fun parseVmess(link: String): VMessBean {
                     host = lstParameter[1].trim()
                 }
                 bean.path = path
-                bean.requestHost = host
+                bean.host = host
             }
         }
     }
@@ -603,26 +814,19 @@ private fun parseCsvVMess(csv: String): VMessBean {
     args.subList(5, args.size).forEach {
 
         when {
-            it == "over-tls=true" -> bean.tls = true
-            it.startsWith("tls-host=") -> bean.requestHost = it.substringAfter("=")
-            it.startsWith("obfs=") -> bean.network = it.substringAfter("=")
-
+            it == "over-tls=true" -> bean.security = "tls"
+            it.startsWith("tls-host=") -> bean.host = it.substringAfter("=")
+            it.startsWith("obfs=") -> bean.type = it.substringAfter("=")
             it.startsWith("obfs-path=") || it.contains("Host:") -> {
-
                 runCatching {
-
                     bean.path = it
                         .substringAfter("obfs-path=\"")
                         .substringBefore("\"obfs")
-
                 }
-
                 runCatching {
-
-                    bean.requestHost = it
+                    bean.host = it
                         .substringAfter("Host:")
                         .substringBefore("[")
-
                 }
 
             }
@@ -633,43 +837,6 @@ private fun parseCsvVMess(csv: String): VMessBean {
 
     return bean
 
-}
-
-
-fun parseVmess1(link: String): VMessBean {
-    val bean = VMessBean()
-    val lnk = link
-        .replace("vmess://", "https://")
-        .replace("vmess1://", "https://")
-        .toHttpUrl()
-    bean.serverAddress = lnk.host
-    bean.serverPort = lnk.port
-    bean.uuid = lnk.username
-    bean.name = lnk.fragment
-    lnk.queryParameterNames.forEach {
-        when (it) {
-            //  "tag" -> bean.tag = lnk.queryParameter(it)
-            "tls" -> bean.tls = lnk.queryParameter(it) == "true"
-            "network" -> {
-                bean.network = lnk.queryParameter(it)!!
-                if (bean.network in arrayOf("http", "ws")) {
-                    bean.path = lnk.pathSegments.joinToString("/", "/")
-                }
-            }
-            /*  "kcp.uplinkcapacity" -> bean.kcpUpLinkCapacity = lnk.queryParameter(it)!!.toInt()
-              "kcp.downlinkcapacity" -> bean.kcpDownLinkCapacity =
-                  lnk.queryParameter(it)!!.toInt()*/
-            "header" -> bean.headerType = lnk.queryParameter(it)
-            // custom
-            "host" -> bean.requestHost = lnk.queryParameter(it)
-            "sni" -> bean.sni = lnk.queryParameter(it)
-            "security" -> bean.security = lnk.queryParameter(it)
-            "alterid" -> bean.alterId = lnk.queryParameter(it)!!.toInt()
-        }
-    }
-
-    bean.initDefaultValues()
-    return bean
 }
 
 fun VMessBean.toV2rayN(): String {
@@ -682,79 +849,97 @@ fun VMessBean.toV2rayN(): String {
         it["port"] = serverPort
         it["id"] = uuid
         it["aid"] = alterId
-        it["net"] = network
-        it["host"] = requestHost
+        it["net"] = type
+        it["host"] = host
         it["type"] = headerType
         it["path"] = path
-        it["tls"] = if (tls) "true" else ""
-        it["sni"] = sni
+        it["tls"] = if (security == "tls") "true" else ""
+        it["sni"] = tlsSni
         it["scy"] = security
 
     }.toString().let { Base64.encodeUrlSafe(it) }
 
 }
 
-fun VMessBean.toVmess1(): String {
+fun StandardV2RayBean.toUri(standard: Boolean): String {
+    if (this is VMessBean && alterId > 0) return toV2rayN()
 
     val builder = HttpUrl.Builder()
         .scheme("https")
+        .username(uuid)
         .host(serverAddress)
         .port(serverPort)
+        .addQueryParameter("type", type)
 
-    if (!uuid.isNullOrBlank()) {
-        builder.username(uuid)
+    when (type) {
+        "tcp" -> {
+            if (headerType == "http") {
+                builder.addQueryParameter("headerType", headerType)
+
+                if (host.isNotBlank()) {
+                    builder.addQueryParameter("host", host)
+                }
+                if (path.isNotBlank()) {
+                    if (standard) {
+                        builder.addQueryParameter("path", path)
+                    } else {
+                        builder.addPathSegments(path)
+                    }
+                }
+            }
+        }
+        "kcp" -> {
+            if (headerType.isNotBlank() && headerType != "none") {
+                builder.addQueryParameter("headerType", headerType)
+            }
+            if (mKcpSeed.isNotBlank()) {
+                builder.addQueryParameter("seed", mKcpSeed)
+            }
+        }
+        "ws", "http" -> {
+            if (host.isNotBlank()) {
+                builder.addQueryParameter("host", host)
+            }
+            if (path.isNotBlank()) {
+                if (standard) {
+                    builder.addQueryParameter("path", path)
+                } else {
+                    builder.addPathSegments(path)
+                }
+            }
+        }
+        "quic" -> {
+            if (headerType.isNotBlank() && headerType != "none") {
+                builder.addQueryParameter("headerType", headerType)
+            }
+            if (quicSecurity.isNotBlank() && quicSecurity != "none") {
+                builder.addQueryParameter("quicSecurity", quicSecurity)
+                builder.addQueryParameter("key", quicKey)
+            }
+        }
+        "grpc" -> {
+            if (grpcServiceName.isNotBlank()) {
+                builder.addQueryParameter("serviceName", grpcServiceName)
+            }
+        }
     }
 
-    if (!path.isNullOrBlank()) {
-        builder.addPathSegment(path)
+    builder.addQueryParameter("security", security)
+    when (security) {
+        "tls" -> {
+            if (tlsSni.isNotBlank()) {
+                builder.addQueryParameter("sni", tlsSni)
+            }
+            if (tlsAlpn.isNotBlank()) {
+                builder.addQueryParameter("alpn", tlsAlpn)
+            }
+        }
     }
 
-    /* if (!tag.isNullOrBlank()) {
-         builder.addQueryParameter("tag", tag)
-     }
- */
-    if (!network.isNullOrBlank()) {
-        builder.addQueryParameter("network", network)
-    }
-
-    /* if (kcpUpLinkCapacity != 0) {
-         builder.addQueryParameter("kcp.uplinkcapacity", "$kcpUpLinkCapacity")
-     }
-
-     if (kcpDownLinkCapacity != 0) {
-         builder.addQueryParameter("kcp.downlinkcapacity", "$kcpDownLinkCapacity")
-     }*/
-
-    if (!headerType.isNullOrBlank()) {
-        builder.addQueryParameter("header", headerType)
-    }
-
-    /* if (mux != 0) {
-         builder.addQueryParameter("mux", "$mux")
-     }*/
-
-    if (!name.isNullOrBlank()) {
+    if (name.isNotBlank()) {
         builder.encodedFragment(name.urlSafe())
     }
 
-    // custom
-
-    if (!requestHost.isNullOrBlank()) {
-        builder.addQueryParameter("host", requestHost)
-    }
-
-    if (!sni.isNullOrBlank()) {
-        builder.addQueryParameter("sni", sni)
-    }
-
-    if (!security.isNullOrBlank()) {
-        builder.addQueryParameter("security", security)
-    }
-
-    if (alterId != 0) {
-        builder.addQueryParameter("alterid", "$alterId")
-    }
-
-    return builder.build().toString().replace("https://", "vmess://")
-
+    return builder.toString()
+        .replace("https://", if (this is VMessBean) "vmess://" else "vless://")
 }
