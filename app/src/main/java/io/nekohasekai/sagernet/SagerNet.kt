@@ -85,7 +85,6 @@ class SagerNet : Application() {
             false
         }
 
-
         fun updateNotificationChannels() {
             if (Build.VERSION.SDK_INT >= 26) @RequiresApi(26) {
                 notification.createNotificationChannels(listOf(
@@ -124,8 +123,10 @@ class SagerNet : Application() {
         DataStore.init()
         updateNotificationChannels()
 
-        Seq.setContext(applicationContext)
-        Libv2ray.setAssetsPath(application.filesDir.absolutePath, "v2ray/")
+        Seq.setContext(this)
+        val externalAssets = getExternalFilesDir(null) ?: filesDir
+        externalAssets.mkdirs()
+        Libv2ray.setAssetsPath(externalAssets.absolutePath, "v2ray/")
     }
 
     fun getPackageInfo(packageName: String) = packageManager.getPackageInfo(packageName,

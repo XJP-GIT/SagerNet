@@ -23,15 +23,17 @@ package io.nekohasekai.sagernet.ui
 
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreference
+import com.takisoft.preferencex.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
+import io.nekohasekai.sagernet.ktx.addOverScrollListener
 import io.nekohasekai.sagernet.ktx.remove
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 
@@ -39,7 +41,13 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
     private lateinit var listener: (BaseService.State) -> Unit
 
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        addOverScrollListener(listView)
+    }
+
+    override fun onCreatePreferencesFix(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = DataStore.configurationStore
         DataStore.initGlobal()
         addPreferencesFromResource(R.xml.global_preferences)
@@ -51,6 +59,12 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         val allowAccess = findPreference<Preference>(Key.ALLOW_ACCESS)!!
         val requireHttp = findPreference<SwitchPreference>(Key.REQUIRE_HTTP)!!
         val portHttp = findPreference<EditTextPreference>(Key.HTTP_PORT)!!
+        val showStopButton = findPreference<SwitchPreference>(Key.SHOW_STOP_BUTTON)!!
+        if (Build.VERSION.SDK_INT < 24) {
+            showStopButton.isVisible = false
+        }
+        val securityAdvisory = findPreference<SwitchPreference>(Key.SECURITY_ADVISORY)!!
+        val showDirectSpeed = findPreference<SwitchPreference>(Key.SHOW_DIRECT_SPEED)!!
 
         portSocks5.setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
         portHttp.setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
@@ -75,6 +89,9 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
                 portSocks5.isEnabled = stopped
                 requireHttp.isEnabled = stopped
                 portHttp.isEnabled = stopped
+                showStopButton.isEnabled = stopped
+                securityAdvisory.isEnabled = stopped
+                showDirectSpeed.isEnabled = stopped
 
                 metedNetwork.isEnabled = sMode == Key.MODE_VPN && stopped
 
@@ -94,7 +111,9 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
     }
 
     override fun onDestroy() {
-        MainActivity.stateListener = null
+        if (MainActivity.stateListener == listener) {
+            MainActivity.stateListener = null
+        }
         super.onDestroy()
     }
 }

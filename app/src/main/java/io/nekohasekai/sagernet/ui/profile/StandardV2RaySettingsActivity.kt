@@ -24,19 +24,24 @@ package io.nekohasekai.sagernet.ui.profile
 import android.os.Bundle
 import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceCategory
-import androidx.preference.PreferenceFragmentCompat
+import com.takisoft.preferencex.PreferenceFragmentCompat
 import com.takisoft.preferencex.SimpleMenuPreference
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
+import io.nekohasekai.sagernet.fmt.v2ray.VLESSBean
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.ktx.app
 
 abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV2RayBean>() {
 
+    var bean: StandardV2RayBean? = null
+
     override fun StandardV2RayBean.init() {
+        bean = this
+
         DataStore.profileName = name
         DataStore.serverAddress = serverAddress
         DataStore.serverPort = serverPort
@@ -44,8 +49,6 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
         DataStore.serverEncryption = encryption
         if (this is VMessBean) {
             DataStore.serverAlterId = alterId
-        } else {
-            DataStore.serverAlterId = -1
         }
         DataStore.serverNetwork = type
         DataStore.serverHeader = headerType
@@ -60,11 +63,13 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
 
         DataStore.serverHeader = headerType
         DataStore.serverSecurity = security
-        DataStore.serverSNI = tlsSni
-        DataStore.serverALPN = tlsAlpn
+        DataStore.serverSNI = sni
+        DataStore.serverALPN = alpn
+        DataStore.serverFlow = flow
         DataStore.serverQuicSecurity = quicSecurity
         DataStore.serverWsMaxEarlyData = wsMaxEarlyData
         DataStore.serverWsBrowserForwarding = wsUseBrowserForwarder
+
     }
 
     override fun StandardV2RayBean.serialize() {
@@ -86,8 +91,9 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
             else -> path = DataStore.serverPath
         }
         security = DataStore.serverSecurity
-        tlsSni = DataStore.serverSNI
-        tlsAlpn = DataStore.serverALPN
+        sni = DataStore.serverSNI
+        alpn = DataStore.serverALPN
+        flow = DataStore.serverFlow
         quicSecurity = DataStore.serverQuicSecurity
         wsMaxEarlyData = DataStore.serverWsMaxEarlyData
         wsUseBrowserForwarder = DataStore.serverWsBrowserForwarding
@@ -103,6 +109,7 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
     lateinit var security: SimpleMenuPreference
     lateinit var tlsSni: EditTextPreference
     lateinit var tlsAlpn: EditTextPreference
+    lateinit var xtlsFlow: SimpleMenuPreference
 
     lateinit var wsCategory: PreferenceCategory
 
@@ -125,10 +132,12 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
         security = findPreference(Key.SERVER_SECURITY)!!
         tlsSni = findPreference(Key.SERVER_SNI)!!
         tlsAlpn = findPreference(Key.SERVER_ALPN)!!
+        xtlsFlow = findPreference(Key.SERVER_FLOW)!!
+
         wsCategory = findPreference(Key.SERVER_WS_CATEGORY)!!
 
         val alterId = findPreference<EditTextPreference>(Key.SERVER_ALTER_ID)!!
-        if (DataStore.serverAlterId == -1) {
+        if (bean is VLESSBean) {
             alterId.isVisible = false
 
             encryption.setEntries(R.array.vless_encryption_entry)
@@ -160,11 +169,6 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
             true
         }
 
-        val tlev = resources.getStringArray(R.array.transport_layer_encryption_value)
-        if (security.value !in tlev) {
-            security.value = tlev[0]
-        }
-        updateTle(security.value)
         security.setOnPreferenceChangeListener { _, newValue ->
             updateTle(newValue as String)
             true
@@ -172,9 +176,39 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
     }
 
     val tcpHeadersValue = app.resources.getStringArray(R.array.tcp_headers_value)
-    val kcpQuicHeadersEntry = app.resources.getStringArray(R.array.kcp_quic_headers_entry)
+    val kcpQuicHeadersValue = app.resources.getStringArray(R.array.kcp_quic_headers_value)
+    val xtlsFlowValue = app.resources.getStringArray(R.array.xtls_flow_value)
 
     fun updateView(network: String) {
+        if (bean is VLESSBean) {
+            when (network) {
+                "tcp", "kcp" -> {
+                    security.setEntries(R.array.transport_layer_encryption_xray_entry)
+                    security.setEntryValues(R.array.transport_layer_encryption_xray_value)
+                    security.value = DataStore.serverSecurity
+
+                    val tlev =
+                        resources.getStringArray(R.array.transport_layer_encryption_xray_value)
+                    if (security.value !in tlev) {
+                        security.value = tlev[0]
+                    }
+                }
+                else -> {
+                    security.setEntries(R.array.transport_layer_encryption_entry)
+                    security.setEntryValues(R.array.transport_layer_encryption_value)
+                    security.value = DataStore.serverSecurity
+
+                    val tlev =
+                        resources.getStringArray(R.array.transport_layer_encryption_value)
+                    if (security.value !in tlev) {
+                        security.value = tlev[0]
+                    }
+                }
+            }
+        }
+
+        updateTle(security.value)
+
         when (network) {
             "tcp" -> {
                 header.setEntries(R.array.tcp_headers_entry)
@@ -229,8 +263,8 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
                 header.setEntryValues(R.array.kcp_quic_headers_entry)
                 path.setTitle(R.string.kcp_seed)
 
-                if (DataStore.serverHeader !in kcpQuicHeadersEntry) {
-                    header.value = kcpQuicHeadersEntry[0]
+                if (DataStore.serverHeader !in kcpQuicHeadersValue) {
+                    header.value = kcpQuicHeadersValue[0]
                 } else {
                     header.value = DataStore.serverHeader
                 }
@@ -248,8 +282,8 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
                 header.setEntryValues(R.array.kcp_quic_headers_entry)
                 path.setTitle(R.string.quic_key)
 
-                if (DataStore.serverHeader !in kcpQuicHeadersEntry) {
-                    header.value = kcpQuicHeadersEntry[0]
+                if (DataStore.serverHeader !in kcpQuicHeadersValue) {
+                    header.value = kcpQuicHeadersValue[0]
                 } else {
                     header.value = DataStore.serverHeader
                 }
@@ -279,10 +313,23 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
             "tls" -> {
                 tlsSni.isVisible = true
                 tlsAlpn.isVisible = true
+                xtlsFlow.isVisible = false
+            }
+            "xtls" -> {
+                tlsSni.isVisible = true
+                tlsAlpn.isVisible = true
+                xtlsFlow.isVisible = true
+
+                if (DataStore.serverFlow !in xtlsFlowValue) {
+                    xtlsFlow.value = xtlsFlowValue[0]
+                } else {
+                    xtlsFlow.value = DataStore.serverFlow
+                }
             }
             else -> {
                 tlsSni.isVisible = false
                 tlsAlpn.isVisible = false
+                xtlsFlow.isVisible = false
             }
         }
     }

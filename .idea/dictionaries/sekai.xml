@@ -3,17 +3,22 @@
     <words>
       <w>acra</w>
       <w>aead</w>
+      <w>alpn</w>
       <w>blackhole</w>
+      <w>dokodemo</w>
       <w>downlink</w>
       <w>geoip</w>
       <w>geosite</w>
       <w>grpc</w>
       <w>gson</w>
       <w>libev</w>
+      <w>libtrojan</w>
+      <w>naiveproxy</w>
       <w>nativeproxy</w>
       <w>nekohasekai</w>
       <w>obfs</w>
       <w>quic</w>
+      <w>rprx</w>
       <w>sagernet</w>
       <w>shadowsocks</w>
       <w>shadowsocksr</w>
@@ -21,6 +26,9 @@
       <w>uplink</w>
       <w>vless</w>
       <w>vmess</w>
+      <w>websocket</w>
+      <w>xray</w>
+      <w>xtls</w>
     </words>
   </dictionary>
 </component>

@@ -23,15 +23,17 @@ package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreference
+import com.takisoft.preferencex.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
+import io.nekohasekai.sagernet.ktx.addOverScrollListener
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 
 class RoutePreferenceFragment : PreferenceFragmentCompat() {
@@ -39,9 +41,16 @@ class RoutePreferenceFragment : PreferenceFragmentCompat() {
     private lateinit var isProxyApps: SwitchPreference
     private lateinit var listener: (BaseService.State) -> Unit
 
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        addOverScrollListener(listView)
+    }
+
+    override fun onCreatePreferencesFix(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = DataStore.configurationStore
         addPreferencesFromResource(R.xml.route_preferences)
+
         val ipv6Route = findPreference<Preference>(Key.IPV6_ROUTE)!!
         val preferIpv6 = findPreference<Preference>(Key.PREFER_IPV6)!!
         val domainStrategy = findPreference<Preference>(Key.DOMAIN_STRATEGY)!!
@@ -116,7 +125,9 @@ class RoutePreferenceFragment : PreferenceFragmentCompat() {
     }
 
     override fun onDestroy() {
-        MainActivity.stateListener = null
+        if (MainActivity.stateListener == listener) {
+            MainActivity.stateListener = null
+        }
         super.onDestroy()
     }
 }

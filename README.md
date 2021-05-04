@@ -20,6 +20,9 @@ The application is designed to be used whenever possible.
 * VMess
 * VLESS
 * Trojan
+* VLESS / Trojan + XTLS ( xtls-plugin )
+* Trojan-Go ( trojan-go-plugin )
+* Proxy Chain
 
 ### Subscription protocols
 
@@ -40,16 +43,14 @@ The application is designed to be used whenever possible.
 * The Chinese apps scanner will only scan system apps if "Show system apps" is checked  
 * ~~V2Ray browser forwarding is not yet available, only for developers to debug~~ Fixed
 
-## XRAY
-
-SagerNet is a V2Ray client, not an Xray client. For that, please use the official X-flutter client.
-
 ## OPEN SOURCE LICENSES
 
 <ul>
     <li><a href="https://github.com/shadowsocks/shadowsocks-android">shadowsocks-android</a>: GPL 3.0</li>
     <li><a href="https://github.com/nekohasekai/AndroidLibV2rayLite">AndroidLibV2rayLite</a>: LGPL 3.0</li>
     <li><a href="https://github.com/shadowsocksRb/shadowsocksr-libev/blob/master/LICENSE">shadowsocksr-libev</a>: GPL 3.0</li>
+    <li><a href="https://github.com/XTLS/Xray-core/blob/main/LICENSE">Xray-core</a>: MPL 2.0</li>
+    <li><a href="https://github.com/p4gefau1t/trojan-go/blob/master/LICENSE">Trojan-Go</a>: GPL 3.0</li>
 </ul>
 
 ### LICENSE

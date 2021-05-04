@@ -26,6 +26,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.text.util.Linkify
 import android.view.View
 import android.widget.TextView
@@ -39,13 +40,19 @@ import com.danielstone.materialaboutlibrary.model.MaterialAboutList
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.widget.ListHolderListener
 import libv2ray.Libv2ray
 import java.io.File
 import java.io.IOException
 import java.io.PrintWriter
 
+
 class AboutFragment : ToolbarFragment(R.layout.layout_about) {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(null)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -120,11 +127,32 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                     )
                     .addItem(MaterialAboutActionItem.Builder()
                         .icon(R.drawable.ic_baseline_airplanemode_active_24)
-                        .text(R.string.v2ray_version)
+                        .text(getString(R.string.version_x, "v2ray-core"))
                         .subText(Libv2ray.getVersion())
                         .setOnClickAction { }
                         .build()
                     )
+                    .apply {
+                        for (plugin in PluginManager.fetchPlugins()) {
+                            try {
+                                addItem(MaterialAboutActionItem.Builder()
+                                    .icon(R.drawable.ic_baseline_nfc_24)
+                                    .text(getString(R.string.version_x, plugin.id))
+                                    .subText("v" + plugin.versionName)
+                                    .setOnClickAction {
+                                        startActivity(Intent().apply {
+                                            action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                            data =
+                                                Uri.fromParts("package", plugin.packageName, null)
+                                        })
+                                    }
+                                    .build()
+                                )
+                            } catch (e: Exception) {
+                                Logs.w(e)
+                            }
+                        }
+                    }
                     .addItem(MaterialAboutActionItem.Builder()
                         .icon(R.drawable.ic_baseline_bug_report_24)
                         .text(R.string.logcat)
@@ -142,7 +170,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                         .text(R.string.github)
                         .setOnClickAction {
                             requireContext().launchCustomTab(Uri.parse(
-                                "https://github.com/nekohasekai/SagerNet"
+                                "https://github.com/SagerNet/SagerNet"
                             ))
                         }
                         .build()

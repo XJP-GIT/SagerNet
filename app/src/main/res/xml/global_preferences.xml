@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
-    app:initialExpandedChildrenCount="3">
+    app:initialExpandedChildrenCount="114">
     <SwitchPreference
         app:defaultValue="true"
         app:icon="@drawable/ic_communication_phonelink_ring"
@@ -25,15 +25,30 @@
         app:key="meteredNetwork"
         app:summary="@string/metered_summary"
         app:title="@string/metered" />
+    <SwitchPreference
+        app:icon="@drawable/ic_baseline_security_24"
+        app:key="securityAdvisory"
+        app:summary="@string/insecure_warn_sum"
+        app:title="@string/insecure_warn" />
     <com.takisoft.preferencex.SimpleMenuPreference
         app:defaultValue="1000"
-        app:entries="@array/notifications_entry"
-        app:entryValues="@array/notifications_value"
+        app:entries="@array/notification_entry"
+        app:entryValues="@array/notification_value"
         app:icon="@drawable/ic_baseline_shutter_speed_24"
         app:key="speedInterval"
         app:title="@string/speed_interval"
         app:useSimpleSummaryProvider="true" />
-
+    <SwitchPreference
+        app:icon="@drawable/ic_baseline_speed_24"
+        app:key="showDirectSpeed"
+        app:summary="@string/show_direct_speed_sum"
+        app:title="@string/show_direct_speed"
+        app:useSimpleSummaryProvider="true" />
+    <SwitchPreference
+        app:icon="@drawable/ic_baseline_multiple_stop_24"
+        app:key="showStopButton"
+        app:summary="@string/show_stop_sum"
+        app:title="@string/show_stop" />
     <SwitchPreference
         app:icon="@drawable/ic_baseline_nat_24"
         app:key="allowAccess"
@@ -52,6 +67,5 @@
         app:key="httpPort"
         app:title="@string/port_http"
         app:useSimpleSummaryProvider="true" />
-
 
 </PreferenceScreen>

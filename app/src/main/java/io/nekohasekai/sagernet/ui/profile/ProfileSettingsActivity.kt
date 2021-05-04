@@ -27,22 +27,25 @@ import android.os.Parcelable
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import androidx.annotation.LayoutRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceDataStore
-import androidx.preference.PreferenceFragmentCompat
 import com.github.shadowsocks.plugin.fragment.AlertDialogFragment
+import com.takisoft.preferencex.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.ktx.Empty
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.utils.DirectBoot
@@ -50,7 +53,10 @@ import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.parcelize.Parcelize
 
 @Suppress("UNCHECKED_CAST")
-abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
+abstract class ProfileSettingsActivity<T : AbstractBean>(
+    @LayoutRes
+    resId: Int = R.layout.layout_settings_activity,
+) : AppCompatActivity(resId),
     OnPreferenceDataStoreChangeListener {
 
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
@@ -85,6 +91,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
 
     companion object {
         const val EXTRA_PROFILE_ID = "id"
+        const val EXTRA_IS_SUBSCRIPTION = "sub"
     }
 
     abstract fun createEntity(): T
@@ -94,7 +101,6 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.layout_settings_activity)
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
             setTitle(R.string.profile_config)
@@ -104,7 +110,6 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
 
         if (savedInstanceState == null) {
             val editingId = intent.getLongExtra(EXTRA_PROFILE_ID, 0L)
-            DataStore.dirty = false
             DataStore.editingId = editingId
             runOnDefaultDispatcher {
                 if (editingId == 0L) {
@@ -130,6 +135,8 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
                             })
                         .commit()
 
+                    DataStore.dirty = false
+
                     DataStore.profileCacheStore.registerChangeListener(this@ProfileSettingsActivity)
                 }
             }
@@ -150,6 +157,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
             if (entity == null) {
                 finish()
                 return
+            }
+            if (entity.id == DataStore.selectedProxy) {
+                SagerNet.stopService()
             }
             ProfileManager.updateProfile(entity.apply { (requireBean() as T).serialize() })
         }
@@ -184,6 +194,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         if (key != Key.PROFILE_DIRTY) {
+            Logs.d("Chnaged $key")
             DataStore.dirty = true
         }
     }
@@ -204,7 +215,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean> : AppCompatActivity(),
 
         lateinit var activity: ProfileSettingsActivity<*>
 
-        override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        override fun onCreatePreferencesFix(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceManager.preferenceDataStore = DataStore.profileCacheStore
             activity.apply {
                 createPreferences(savedInstanceState, rootKey)

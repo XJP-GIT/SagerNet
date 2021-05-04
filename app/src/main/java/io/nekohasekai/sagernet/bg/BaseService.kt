@@ -123,6 +123,7 @@ class BaseService {
 
         private suspend fun loop() {
             var lastQueryTime = 0L
+            val showDirectSpeed = DataStore.showDirectSpeed
             while (true) {
                 val delayMs = bandwidthListeners.values.minOrNull()
                 delay(delayMs ?: return)
@@ -131,14 +132,13 @@ class BaseService {
                 val sinceLastQueryInSeconds = (queryTime - lastQueryTime).toDouble() / 1000L
                 val proxy = data?.proxy ?: continue
                 lastQueryTime = queryTime
-                val up = proxy.uplink
-                val down = proxy.downlink
-                if (up + down == 0L) continue
                 val stats = TrafficStats(
-                    (up / sinceLastQueryInSeconds).toLong(),
-                    (down / sinceLastQueryInSeconds).toLong(),
-                    proxy.uplinkTotal,
-                    proxy.downlinkTotal
+                    (proxy.uplinkProxy / sinceLastQueryInSeconds).toLong(),
+                    (proxy.downlinkProxy / sinceLastQueryInSeconds).toLong(),
+                    if (showDirectSpeed) (proxy.uplinkDirect / sinceLastQueryInSeconds).toLong() else 0L,
+                    if (showDirectSpeed) (proxy.downlinkDirect / sinceLastQueryInSeconds).toLong() else 0L,
+                    proxy.uplinkTotalProxy,
+                    proxy.downlinkTotalProxy
                 )
                 if (data?.state == State.Connected && bandwidthListeners.isNotEmpty()) {
                     broadcast { item ->

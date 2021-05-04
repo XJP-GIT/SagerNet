@@ -23,18 +23,20 @@ package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.text.format.Formatter
-import android.util.TypedValue
+import android.text.method.LinkMovementMethod
+import android.text.util.Linkify
 import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import androidx.core.view.size
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.*
@@ -42,7 +44,6 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
-import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficStats
@@ -61,9 +62,10 @@ import kotlin.collections.HashSet
 import kotlin.properties.Delegates
 
 
-class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
-    Toolbar.OnMenuItemClickListener,
-    PopupMenu.OnMenuItemClickListener {
+class ConfigurationFragment @JvmOverloads constructor(
+    val select: Boolean = false,
+) : ToolbarFragment(R.layout.layout_group_list),
+    PopupMenu.OnMenuItemClickListener, Toolbar.OnMenuItemClickListener {
 
     lateinit var adapter: GroupPagerAdapter
     lateinit var tabLayout: TabLayout
@@ -72,8 +74,16 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        toolbar.inflateMenu(R.menu.add_profile_menu)
-        toolbar.setOnMenuItemClickListener(this)
+        if (!select) {
+            toolbar.inflateMenu(R.menu.add_profile_menu)
+            toolbar.setOnMenuItemClickListener(this)
+        } else {
+            toolbar.setTitle(R.string.select_profile)
+            toolbar.setNavigationIcon(R.drawable.ic_navigation_close)
+            toolbar.setNavigationOnClickListener {
+                requireActivity().finish()
+            }
+        }
 
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
@@ -208,6 +218,12 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
             R.id.action_new_trojan -> {
                 startActivity(Intent(requireActivity(), TrojanSettingsActivity::class.java))
             }
+            R.id.action_new_trojan_go -> {
+                startActivity(Intent(requireActivity(), TrojanGoSettingsActivity::class.java))
+            }
+            R.id.action_new_chain -> {
+                startActivity(Intent(requireActivity(), ChainSettingsActivity::class.java))
+            }
         }
         return true
     }
@@ -320,23 +336,46 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
         lateinit var undoManager: UndoSnackbarManager<ProxyEntity>
         lateinit var adapter: ConfigurationAdapter
 
-        private val isEnabled get() = (activity as MainActivity).state.let { it.canStop || it == BaseService.State.Stopped }
-        private fun isProfileEditable(id: Long) =
-            (activity as MainActivity).state == BaseService.State.Stopped || id != DataStore.selectedProxy
+        override fun onSaveInstanceState(outState: Bundle) {
+            super.onSaveInstanceState(outState)
 
-        lateinit var layoutManager: RecyclerView.LayoutManager
+            outState.putParcelable("proxyGroup", proxyGroup)
+        }
+
+        override fun onViewStateRestored(savedInstanceState: Bundle?) {
+            super.onViewStateRestored(savedInstanceState)
+
+            savedInstanceState?.getParcelable<ProxyGroup>("proxyGroup")?.also {
+                proxyGroup = it
+            }
+        }
+
+        private val isEnabled: Boolean
+            get() {
+                return ((activity as? MainActivity) ?: return false)
+                    .state.let { it.canStop || it == BaseService.State.Stopped }
+            }
+
+        private fun isProfileEditable(id: Long): Boolean {
+            return ((activity as? MainActivity) ?: return false)
+                .state == BaseService.State.Stopped || id != DataStore.selectedProxy
+        }
+
+        lateinit var layoutManager: LinearLayoutManager
         lateinit var configurationListView: RecyclerView
+
+        val select by lazy { (parentFragment as ConfigurationFragment).select }
 
         override fun onResume() {
             super.onResume()
 
             if (::configurationListView.isInitialized && configurationListView.size == 0) {
                 configurationListView.adapter = adapter
-                if (adapter.configurationIdList.isEmpty()) {
-                    runOnDefaultDispatcher {
-                        adapter.reloadProfiles(proxyGroup.id)
-                    }
+                runOnDefaultDispatcher {
+                    adapter.reloadProfiles(proxyGroup.id)
                 }
+            } else if (!::configurationListView.isInitialized) {
+                onViewCreated(requireView(), null)
             }
         }
 
@@ -355,11 +394,12 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
             ProfileManager.addListener(adapter)
             configurationListView.adapter = adapter
             configurationListView.setItemViewCacheSize(20)
+            addOverScrollListener(configurationListView)
 
-            undoManager =
-                UndoSnackbarManager(activity as MainActivity, adapter)
+            if (!select && !proxyGroup.isSubscription) {
 
-            if (!proxyGroup.isSubscription) {
+                undoManager =
+                    UndoSnackbarManager(activity as MainActivity, adapter)
 
                 ItemTouchHelper(object :
                     ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN,
@@ -515,7 +555,9 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                 if (profile.groupId != proxyGroup.id) return
 
                 configurationListView.post {
-                    undoManager.flush()
+                    if (::undoManager.isInitialized) {
+                        undoManager.flush()
+                    }
                     val pos = itemCount
                     configurationList[profile.id] = profile
                     configurationIdList.add(profile.id)
@@ -528,7 +570,9 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                 val index = configurationIdList.indexOf(profile.id)
                 if (index < 0) return
                 configurationListView.post {
-                    undoManager.flush()
+                    if (::undoManager.isInitialized) {
+                        undoManager.flush()
+                    }
                     configurationList[profile.id] = profile
                     notifyItemChanged(index)
                 }
@@ -631,33 +675,34 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                 val selectedView: LinearLayout = view.findViewById(R.id.selected_view)
                 val editButton: ImageView = view.findViewById(R.id.edit)
                 val shareLayout: LinearLayout = view.findViewById(R.id.share)
+                val shareLayer: LinearLayout = view.findViewById(R.id.share_layer)
                 val shareButton: ImageView = view.findViewById(R.id.shareIcon)
 
                 override fun bind(proxyEntity: ProxyEntity) {
 
-                    view.setOnClickListener {
-                        runOnDefaultDispatcher {
-                            if (DataStore.selectedProxy != proxyEntity.id) {
-                                val lastSelected = DataStore.selectedProxy
-                                DataStore.selectedProxy = proxyEntity.id
-                                ProfileManager.postUpdate(lastSelected)
-                                onMainDispatcher {
-                                    selectedView.visibility = View.VISIBLE
-                                    if ((activity as MainActivity).state.canStop) SagerNet.reloadService()
+                    if (select) {
+                        view.setOnClickListener {
+                            (requireActivity() as ProfileSelectActivity).returnProfile(
+                                proxyEntity.id)
+                        }
+                    } else {
+                        view.setOnClickListener {
+                            runOnDefaultDispatcher {
+                                if (DataStore.selectedProxy != proxyEntity.id) {
+                                    val lastSelected = DataStore.selectedProxy
+                                    DataStore.selectedProxy = proxyEntity.id
+                                    ProfileManager.postUpdate(lastSelected)
+                                    onMainDispatcher {
+                                        selectedView.visibility = View.VISIBLE
+                                        if ((activity as MainActivity).state.canStop) SagerNet.reloadService()
+                                    }
                                 }
                             }
+
                         }
                     }
 
-
                     profileName.text = proxyEntity.displayName()
-
-                    if (proxyGroup.type == 1) {
-                        profileName.isSingleLine = true
-                        profileName.typeface = Typeface.DEFAULT
-                        profileName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                    }
-
                     profileType.text = proxyEntity.displayType()
 
                     var rx = proxyEntity.rx
@@ -670,7 +715,7 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                     }
 
                     val showTraffic = rx + tx != 0L
-                    trafficText.isGone = !showTraffic
+                    trafficText.isVisible = showTraffic
                     if (showTraffic) {
                         trafficText.text = view.context.getString(R.string.traffic,
                             Formatter.formatFileSize(view.context, tx),
@@ -678,41 +723,103 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                     }
                     //  (trafficText.parent as View).isGone = !showTraffic && proxyGroup.isSubscription
 
-                    editButton.isGone = proxyGroup.isSubscription
-                    if (!proxyGroup.isSubscription) {
-                        editButton.setOnClickListener {
-                            it.context.startActivity(proxyEntity.settingIntent(it.context))
-                        }
+                    editButton.setOnClickListener {
+                        it.context.startActivity(proxyEntity.settingIntent(it.context,
+                            proxyGroup.isSubscription))
                     }
 
-                   /* if (BuildConfig.DEBUG && proxyEntity.requireBean()
-                            .isInsecure() == ValidateResult.INSECURE
-                    ) {
-                        shareLayout.setBackgroundColor(Color.RED)
-                        shareButton.setImageResource(R.drawable.ic_baseline_warning_24)
-                        shareButton.setColorFilter(Color.WHITE)
-
-                        shareButton.setOnClickListener {
-                            // TODO: Alert insecure
-                        }
-                    } else {*/
-                        shareLayout.setBackgroundColor(Color.TRANSPARENT)
-                        shareButton.setImageResource(R.drawable.ic_social_share)
-                        shareButton.setColorFilter(Color.GRAY)
-
-                        shareButton.setOnClickListener {
-                            val popup = PopupMenu(requireContext(), it)
-                            popup.menuInflater.inflate(R.menu.socks_share_menu, popup.menu)
-                            popup.setOnMenuItemClickListener(this@ConfigurationHolder)
-                            popup.show()
-                        }
-//                    }
-
+                    shareLayout.isGone = select
+                    editButton.isGone = select
 
                     runOnDefaultDispatcher {
-                        val selected = DataStore.selectedProxy == proxyEntity.id
-                        onMainDispatcher {
-                            selectedView.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+                        if (!select) {
+                            val selected = DataStore.selectedProxy == proxyEntity.id
+                            val started = DataStore.startedProxy == proxyEntity.id
+                            onMainDispatcher {
+                                editButton.isEnabled = !started
+                                selectedView.visibility =
+                                    if (selected) View.VISIBLE else View.INVISIBLE
+                            }
+                        }
+
+                        if (!(select || proxyEntity.type == 8)) {
+
+                            val validateResult =
+                                if (DataStore.securityAdvisory) {
+                                    proxyEntity.requireBean().isInsecure()
+                                } else ResultLocal
+
+                            when (validateResult) {
+                                is ResultInsecure -> onMainDispatcher {
+                                    shareLayout.isVisible = true
+
+                                    shareLayer.setBackgroundColor(Color.RED)
+                                    shareButton.setImageResource(R.drawable.ic_baseline_warning_24)
+                                    shareButton.setColorFilter(Color.WHITE)
+
+                                    shareLayout.setOnClickListener {
+                                        AlertDialog.Builder(requireContext())
+                                            .setTitle(R.string.insecure)
+                                            .setMessage(resources.openRawResource(validateResult.textRes)
+                                                .bufferedReader().use { it.readText() })
+                                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                                val popup = PopupMenu(requireContext(), it)
+                                                popup.menuInflater.inflate(R.menu.socks_share_menu,
+                                                    popup.menu)
+                                                popup.setOnMenuItemClickListener(this@ConfigurationHolder)
+                                                popup.show()
+                                            }
+                                            .show().apply {
+                                                findViewById<TextView>(android.R.id.message)?.apply {
+                                                    Linkify.addLinks(this, Linkify.WEB_URLS)
+                                                    movementMethod =
+                                                        LinkMovementMethod.getInstance()
+                                                }
+                                            }
+                                    }
+                                }
+                                is ResultDeprecated -> onMainDispatcher {
+                                    shareLayout.isVisible = true
+
+                                    shareLayer.setBackgroundColor(Color.YELLOW)
+                                    shareButton.setImageResource(R.drawable.ic_baseline_warning_24)
+                                    shareButton.setColorFilter(Color.GRAY)
+
+                                    shareLayout.setOnClickListener {
+                                        AlertDialog.Builder(requireContext())
+                                            .setTitle(R.string.deprecated)
+                                            .setMessage(resources.openRawResource(validateResult.textRes)
+                                                .bufferedReader().use { it.readText() })
+                                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                                val popup = PopupMenu(requireContext(), it)
+                                                popup.menuInflater.inflate(R.menu.socks_share_menu,
+                                                    popup.menu)
+                                                popup.setOnMenuItemClickListener(this@ConfigurationHolder)
+                                                popup.show()
+                                            }
+                                            .show().apply {
+                                                findViewById<TextView>(android.R.id.message)?.apply {
+                                                    Linkify.addLinks(this, Linkify.WEB_URLS)
+                                                    movementMethod =
+                                                        LinkMovementMethod.getInstance()
+                                                }
+                                            }
+                                    }
+                                }
+                                else -> onMainDispatcher {
+                                    shareLayer.setBackgroundColor(Color.TRANSPARENT)
+                                    shareButton.setImageResource(R.drawable.ic_social_share)
+                                    shareButton.setColorFilter(Color.GRAY)
+
+                                    shareLayout.setOnClickListener {
+                                        val popup = PopupMenu(requireContext(), it)
+                                        popup.menuInflater.inflate(R.menu.socks_share_menu,
+                                            popup.menu)
+                                        popup.setOnMenuItemClickListener(this@ConfigurationHolder)
+                                        popup.show()
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -729,14 +836,18 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                 override fun bind(proxyEntity: ProxyEntity) {
 
                     view.setOnClickListener {
-                        runOnDefaultDispatcher {
-                            if (DataStore.selectedProxy != proxyEntity.id) {
-                                val lastSelected = DataStore.selectedProxy
-                                DataStore.selectedProxy = proxyEntity.id
-                                ProfileManager.postUpdate(lastSelected)
-                                onMainDispatcher {
-                                    selectedView.visibility = View.VISIBLE
-                                    if ((activity as MainActivity).state.canStop) SagerNet.reloadService()
+                        if (select) {
+                            (requireActivity() as ProfileSelectActivity).returnProfile(proxyEntity.id)
+                        } else {
+                            runOnDefaultDispatcher {
+                                if (DataStore.selectedProxy != proxyEntity.id) {
+                                    val lastSelected = DataStore.selectedProxy
+                                    DataStore.selectedProxy = proxyEntity.id
+                                    ProfileManager.postUpdate(lastSelected)
+                                    onMainDispatcher {
+                                        selectedView.visibility = View.VISIBLE
+                                        if ((activity as MainActivity).state.canStop) SagerNet.reloadService()
+                                    }
                                 }
                             }
                         }
@@ -745,11 +856,16 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                     profileName.text = proxyEntity.displayName()
                     profileType.text = proxyEntity.displayType()
 
-                    runOnDefaultDispatcher {
-                        val selected = DataStore.selectedProxy == proxyEntity.id
-                        onMainDispatcher {
-                            selectedView.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+                    if (!select) {
+
+                        runOnDefaultDispatcher {
+                            val selected = DataStore.selectedProxy == proxyEntity.id
+                            onMainDispatcher {
+                                selectedView.visibility =
+                                    if (selected) View.VISIBLE else View.INVISIBLE
+                            }
                         }
+
                     }
 
                 }

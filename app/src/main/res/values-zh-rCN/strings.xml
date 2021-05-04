@@ -9,7 +9,6 @@
 
     <string name="misc">其他</string>
     <string name="app_version">版本</string>
-    <string name="v2ray_version">版本 (v2ray-core)</string>
     <string name="logcat">导出调试信息</string>
     <string name="logcat_summary">这种非常有用哇</string>
 
@@ -75,6 +74,7 @@
     <string name="speed_interval">速度通知更新间隔</string>
 
     <string name="traffic">%1$s↑ %2$s↓</string>
+    <string name="speed_detail">代理： %1$s↑ %2$s↓\n直连： %3$s↑ %4$s↓</string>
     <string name="stat_summary">上传: \t\t\t\t\t%3$s\t↑\t%1$s\n下载: \t%4$s\t↓\t%2$s</string>
     <string name="speed">%s/s</string>
     <string name="connection_test_pending">测试连接</string>
@@ -103,8 +103,6 @@
     <string name="security">传输层加密</string>
     <string name="network">传输协议</string>
     <string name="header_type">伪装类型</string>
-    <string name="request_host">请求域名</string>
-    <string name="path">Path / Key / Seed / ServiceName</string>
     <string name="tls">使用 TLS</string>
     <string name="sni">服务器名称指示</string>
     <string name="encryption">加密</string>
@@ -260,5 +258,32 @@
     <string name="cag_misc">杂项</string>
     <string name="enable_mux">启用多路复用</string>
     <string name="mux_concurrency">复用最大并发</string>
+    <string name="ws_host">WebSocket 主机</string>
+    <string name="ws_path">WebSocket 路径</string>
+    <string name="http_host">HTTP 主机</string>
+    <string name="http_path">HTTP 路径</string>
+    <string name="quic_security">QUIC 加密方式</string>
+    <string name="quic_key">QUIC 密钥</string>
+    <string name="kcp_seed">mKCP 混淆密码</string>
+    <string name="grpc_service_name">gRPC 服务名称</string>
+    <string name="alpn">应用层协议协商</string>
+    <string name="group_duplicate">重复:\n%s</string>
+    <string name="deduplication">去重</string>
+    <string name="version_x">版本 (%s)</string>
+    <string name="flow">流控</string>
+    <string name="show_stop">显示停止按钮</string>
+    <string name="show_stop_sum">如果您不想使用快捷图块</string>
+    <string name="ss_cat">Shadowsocks 设置</string>
+    <string name="insecure">不安全</string>
+    <string name="deprecated">已废弃</string>
+    <string name="insecure_warn">安全建议</string>
+    <string name="insecure_warn_sum">由 Qv2ray 开发者社区提供</string>
+    <string name="show_direct_speed">显示直连速度</string>
+    <string name="show_direct_speed_sum">在通知中也显示不经过代理的流量速度</string>
+    <string name="select_profile">选择配置</string>
+    <string name="proxy_chain">链式代理</string>
+    <string name="chain_settings">链设置</string>
+    <string name="circular_reference">循环引用</string>
+    <string name="circular_reference_sum">路由中不能包含自己.</string>
 
 </resources>

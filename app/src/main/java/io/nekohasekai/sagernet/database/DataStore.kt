@@ -48,6 +48,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
 
     var selectedProxy by configurationStore.long(Key.PROFILE_ID)
+    var startedProxy by configurationStore.long(Key.PROFILE_STARTED)
+
     var selectedGroup by configurationStore.long(Key.PROFILE_GROUP) {
         SagerNet.currentProfile?.groupId ?: 0L
     }
@@ -81,6 +83,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableLocalDNS by configurationStore.boolean(Key.ENABLE_LOCAL_DNS) { true }
     var remoteDNS by configurationStore.string(Key.REMOTE_DNS) { "https://1.1.1.1/dns-query" }
     var domesticDns by configurationStore.string(Key.DOMESTIC_DNS) { "9.9.9.11" }
+    var securityAdvisory by configurationStore.boolean(Key.SECURITY_ADVISORY)
 
     // hopefully hashCode = mHandle doesn't change, currently this is true from KitKat to Nougat
     private val userIndex by lazy { Binder.getCallingUserHandle().hashCode() }
@@ -121,6 +124,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var requireHttp by configurationStore.boolean(Key.REQUIRE_HTTP)
     var enableMux by configurationStore.boolean(Key.ENABLE_MUX)
     var muxConcurrency by configurationStore.stringToInt(Key.MUX_CONCURRENCY) { 8 }
+    var showStopButton by configurationStore.boolean(Key.SHOW_STOP_BUTTON)
+    var showDirectSpeed by configurationStore.boolean(Key.SHOW_DIRECT_SPEED)
 
     val persistAcrossReboot by configurationStore.boolean(Key.PERSIST_ACROSS_REBOOT) { true }
     val canToggleLocked: Boolean get() = configurationStore.getBoolean(Key.DIRECT_BOOT_AWARE) == true
@@ -136,6 +141,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serverPort by profileCacheStore.stringToInt(Key.SERVER_PORT)
     var serverUsername by profileCacheStore.string(Key.SERVER_USERNAME)
     var serverPassword by profileCacheStore.string(Key.SERVER_PASSWORD)
+    var serverPassword1 by profileCacheStore.string(Key.SERVER_PASSWORD1)
     var serverUdp by profileCacheStore.boolean(Key.SERVER_UDP)
     var serverMethod by profileCacheStore.string(Key.SERVER_METHOD)
     var serverPlugin by profileCacheStore.string(Key.SERVER_PLUGIN)
@@ -155,10 +161,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serverSNI by profileCacheStore.string(Key.SERVER_SNI)
     var serverTLS by profileCacheStore.boolean(Key.SERVER_TLS)
     var serverEncryption by profileCacheStore.string(Key.SERVER_ENCRYPTION)
-    var serverALPN by configurationStore.string(Key.SERVER_ALPN)
-    var serverQuicSecurity by configurationStore.string(Key.SERVER_QUIC_SECURITY)
-    var serverWsMaxEarlyData by configurationStore.stringToInt(Key.SERVER_WS_MAX_EARLY_DATA)
-    var serverWsBrowserForwarding by configurationStore.boolean(Key.SERVER_WS_BROWSER_FORWARDING)
+    var serverALPN by profileCacheStore.string(Key.SERVER_ALPN)
+    var serverFlow by profileCacheStore.string(Key.SERVER_FLOW)
+    var serverQuicSecurity by profileCacheStore.string(Key.SERVER_QUIC_SECURITY)
+    var serverWsMaxEarlyData by profileCacheStore.stringToInt(Key.SERVER_WS_MAX_EARLY_DATA)
+    var serverWsBrowserForwarding by profileCacheStore.boolean(Key.SERVER_WS_BROWSER_FORWARDING)
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {

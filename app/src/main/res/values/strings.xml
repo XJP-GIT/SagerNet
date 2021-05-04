@@ -9,7 +9,7 @@
 
     <string name="misc">Misc</string>
     <string name="app_version">Version</string>
-    <string name="v2ray_version">Version (v2ray-core)</string>
+    <string name="version_x">Version (%s)</string>
     <string name="logcat">Export debug information</string>
     <string name="logcat_summary">Such useful very wow</string>
 
@@ -45,6 +45,7 @@
     <string name="group_added">Added: \n%s</string>
     <string name="group_changed">Updated: \n%s</string>
     <string name="group_deleted">Deleted: \n%s</string>
+    <string name="group_duplicate">Duplicate: \n%s</string>
 
     <!-- misc -->
     <string name="service_mode">Service mode</string>
@@ -75,8 +76,13 @@
     <string name="speed_interval">Speed notification update interval</string>
     <string name="disable">Disable</string>
     <string name="cag_misc">Misc Settings</string>
+    <string name="show_stop">Show stop button</string>
+    <string name="show_stop_sum">If you don’t want to use Quick Tile as the switch</string>
+    <string name="show_direct_speed">Show direct speed</string>
+    <string name="show_direct_speed_sum">Show the traffic speed without proxy in the notification as well</string>
 
     <string name="traffic">%1$s↑ %2$s↓</string>
+    <string name="speed_detail">Proxy： %1$s↑ %2$s↓\nDirect： %3$s↑ %4$s↓</string>
     <string name="stat_summary">Sent: \t\t\t\t\t%3$s\t↑\t%1$s\nReceived: \t%4$s\t↓\t%2$s</string>
     <string name="speed">%s/s</string>
     <string name="connection_test_pending">Check Connectivity</string>
@@ -104,6 +110,7 @@
     <string name="alter_id">Alter ID</string>
     <string name="security">Transport layer encryption</string>
     <string name="network">Network</string>
+    <string name="flow">Flow control algorithm</string>
 
     <string name="header_type">Header Type</string>
     <string name="ws_host">WebSocket Host</string>
@@ -113,7 +120,7 @@
     <string name="quic_security">QUIC Security</string>
     <string name="quic_key">Quic KEY</string>
     <string name="kcp_seed">mKCP Seed</string>
-    <string name="grpc_service_name">grpc ServiceName</string>
+    <string name="grpc_service_name">gRPC ServiceName</string>
 
     <string name="tls">Use TLS</string>
     <string name="sni">Server Name Indication</string>
@@ -192,14 +199,20 @@
     <string name="edit">Edit</string>
     <string name="share">Share</string>
     <string name="add_profile">Add Profile</string>
+    <string name="select_profile">Select Profile</string>
     <string name="action_profile">Profile</string>
-    <string name="action_socks">SOCKS</string>
-    <string name="action_http">HTTP</string>
-    <string name="action_shadowsocks">Shadowsocks</string>
-    <string name="action_shadowsocksr">ShadowsocksR</string>
-    <string name="action_vmess">VMess</string>
-    <string name="action_vless">VLESS</string>
-    <string name="action_trojan">Trojan</string>
+    <string name="action_socks" translatable="false">SOCKS</string>
+    <string name="action_http" translatable="false">HTTP</string>
+    <string name="action_shadowsocks" translatable="false">Shadowsocks</string>
+    <string name="action_shadowsocksr" translatable="false">ShadowsocksR</string>
+    <string name="action_vmess" translatable="false">VMess</string>
+    <string name="action_vless" translatable="false">VLESS</string>
+    <string name="action_trojan" translatable="false">Trojan</string>
+    <string name="action_trojan_go" translatable="false">Trojan Go</string>
+    <string name="proxy_chain">Proxy Chain</string>
+    <string name="chain_settings">Chain Settings</string>
+    <string name="circular_reference">Circular reference</string>
+    <string name="circular_reference_sum">The route cannot contain itself.</string>
 
     <string name="action_create_group">Empty group</string>
     <string name="action_from_link">From subscription</string>
@@ -238,6 +251,10 @@
         <item quantity="other">%d proxies added</item>
     </plurals>
     <string name="undo">Undo</string>
+    <string name="insecure_warn">Security Advisory</string>
+    <string name="insecure_warn_sum">Provided by the Qv2ray Developer Community</string>
+    <string name="insecure">Insecure</string>
+    <string name="deprecated">Deprecated</string>
 
     <!-- tasker -->
     <string name="toggle_service_state">Start the service</string>
@@ -256,6 +273,7 @@
     <string name="cleartext_http_warning">Cleartext HTTP traffic is insecure</string>
     <string name="error_title">Error</string>
     <string name="no_proxies_found">No proxies found in the link</string>
+    <string name="deduplication">Deduplication</string>
 
     <!-- plugin -->
     <string name="plugin">Plugin</string>
@@ -266,6 +284,7 @@
     <string name="plugin_auto_connect_unlock_only">This plugin might not work with Auto Connect</string>
 
     <string name="proxy_cat">Server Settings</string>
+    <string name="ss_cat">Shadowsocks Settings</string>
     <string name="feature_cat">Feature Settings</string>
     <string name="unsaved_changes_prompt">Changes not saved. Do you want to save?</string>
     <string name="yes">Yes</string>

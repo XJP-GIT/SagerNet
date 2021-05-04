@@ -34,11 +34,19 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import io.nekohasekai.sagernet.fmt.gson.GsonsKt;
 
-public abstract class AbstractBean implements Cloneable<AbstractBean>, Comparable<AbstractBean> {
+public abstract class AbstractBean implements Cloneable<AbstractBean> {
 
     public String serverAddress;
     public int serverPort;
     public String name;
+
+    public String displayName() {
+        if (StrUtil.isNotBlank(name)) {
+            return name;
+        } else {
+            return serverAddress + ":" + serverPort;
+        }
+    }
 
     public void initDefaultValues() {
         if (StrUtil.isBlank(serverAddress)) {
@@ -75,13 +83,6 @@ public abstract class AbstractBean implements Cloneable<AbstractBean>, Comparabl
     public abstract AbstractBean clone();
 
     @Override
-    public int compareTo(AbstractBean o) {
-        if (this == o) return 0;
-        return HexUtil.encodeHexStr(KryoConverters.serializeWithoutName(this))
-                .compareTo(HexUtil.encodeHexStr(KryoConverters.serializeWithoutName((AbstractBean) o)));
-    }
-
-    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
@@ -98,4 +99,8 @@ public abstract class AbstractBean implements Cloneable<AbstractBean>, Comparabl
     public String toString() {
         return getClass().getSimpleName() + " " + JSONUtil.formatJsonStr(GsonsKt.getGson().toJson(this));
     }
+
+    public void applyFeatureSettings(AbstractBean other) {
+    }
+
 }

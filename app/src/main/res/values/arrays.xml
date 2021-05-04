@@ -326,9 +326,35 @@
         <item>grpc</item>
     </string-array>
 
+    <string-array name="trojan_go_networks_entry" translatable="false">
+        <item>NONE</item>
+        <item>WS</item>
+    </string-array>
+
+    <string-array name="trojan_go_networks_value" translatable="false">
+        <item>none</item>
+        <item>ws</item>
+    </string-array>
+
     <string-array name="tcp_headers_entry" translatable="false">
         <item>NONE</item>
         <item>HTTP</item>
+    </string-array>
+
+    <string-array name="trojan_go_security_entry">
+        <item>NONE</item>
+        <item>SHADOWSOCKS</item>
+    </string-array>
+
+    <string-array name="trojan_go_security_value">
+        <item>none</item>
+        <item>ss</item>
+    </string-array>
+
+    <string-array name="trojan_go_methods">
+        <item>AES-128-GCM</item>
+        <item>AES-256-GCM</item>
+        <item>CHACHA20-IETF-POLY1305</item>
     </string-array>
 
     <string-array name="tcp_headers_value" translatable="false">
@@ -400,7 +426,47 @@
         <item>tls</item>
     </string-array>
 
-    <string-array name="notifications_entry">
+    <string-array name="transport_layer_encryption_xray_entry" translatable="false">
+        <item>NONE</item>
+        <item>TLS</item>
+        <item>XTLS</item>
+    </string-array>
+
+    <string-array name="transport_layer_encryption_xray_value" translatable="false">
+        <item>none</item>
+        <item>tls</item>
+        <item>xtls</item>
+    </string-array>
+
+    <string-array name="trojan_transport_layer_encryption_entry" translatable="false">
+        <item>TLS</item>
+        <item>XTLS</item>
+    </string-array>
+
+    <string-array name="trojan_transport_layer_encryption_value" translatable="false">
+        <item>tls</item>
+        <item>xtls</item>
+    </string-array>
+
+    <string-array name="xtls_flow_entry" translatable="false">
+        <item>XTLS-RPRX-ORIGIN</item>
+        <item>XTLS-RPRX-ORIGIN-UDP443</item>
+        <item>XTLS-RPRX-DIRECT</item>
+        <item>XTLS-RPRX-DIRECT-UDP443</item>
+        <item>XTLS-RPRX-SPLICE</item>
+        <item>XTLS-RPRX-SPLICE-UDP443</item>
+    </string-array>
+
+    <string-array name="xtls_flow_value" translatable="false">
+        <item>xtls-rprx-origin</item>
+        <item>xtls-rprx-origin-udp443</item>
+        <item>xtls-rprx-direct</item>
+        <item>xtls-rprx-direct-udp443</item>
+        <item>xtls-rprx-splice</item>
+        <item>xtls-rprx-splice-udp443</item>
+    </string-array>
+
+    <string-array name="notification_entry">
         <item>@string/disable</item>
         <item>500ms</item>
         <item>1s</item>
@@ -408,7 +474,7 @@
         <item>10s</item>
     </string-array>
 
-    <string-array name="notifications_value" translatable="false">
+    <string-array name="notification_value" translatable="false">
         <item>0</item>
         <item>500</item>
         <item>1000</item>

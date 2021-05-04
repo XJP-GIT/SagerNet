@@ -43,6 +43,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.preference.Preference
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import cn.hutool.core.net.URLDecoder
@@ -164,9 +165,23 @@ fun DialogFragment.showAllowingStateLoss(fragmentManager: FragmentManager, tag: 
     if (!fragmentManager.isStateSaved) show(fragmentManager, tag)
 }
 
+private val encoder = URLEncoder().apply {
+
+    addSafeCharacter('*')
+    addSafeCharacter('-')
+    addSafeCharacter('.')
+    addSafeCharacter('_')
+    addSafeCharacter('&')
+    addSafeCharacter('/')
+
+}
+
+fun String.pathSafe(): String {
+    return encoder.encode(this, CharsetUtil.CHARSET_UTF_8)
+}
 
 fun String.urlSafe(): String {
-    return URLEncoder.createDefault().encode(this, CharsetUtil.CHARSET_UTF_8)
+    return URLEncoder.ALL.encode(this, CharsetUtil.CHARSET_UTF_8)
 }
 
 fun String.unUrlSafe(): String {
@@ -214,3 +229,22 @@ fun View.crossFadeFrom(other: View) {
 }
 
 fun Fragment.snackbar(text: CharSequence) = (requireActivity() as MainActivity).snackbar(text)
+fun Fragment.addOverScrollListener(recyclerView: RecyclerView) {
+    if (activity !is MainActivity) return
+    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+    val adapter = recyclerView.adapter!!
+    recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            super.onScrolled(recyclerView, dx, dy)
+            if (dy > 0 && layoutManager.findFirstVisibleItemPosition() > 0 && layoutManager.findLastVisibleItemPosition() >= adapter.itemCount-1) {
+                (activity as MainActivity?)?.fab?.apply {
+                    if (isShown) hide()
+                }
+            } else {
+                (activity as MainActivity?)?.fab?.apply {
+                    if (!isShown) show()
+                }
+            }
+        }
+    })
+}

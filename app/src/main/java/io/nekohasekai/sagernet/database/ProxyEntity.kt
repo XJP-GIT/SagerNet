@@ -26,9 +26,12 @@ import android.content.Intent
 import android.os.Parcel
 import android.os.Parcelable
 import androidx.room.*
+import cn.hutool.core.lang.Validator
+import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.aidl.TrafficStats
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.KryoConverters
+import io.nekohasekai.sagernet.fmt.chain.ChainBean
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.http.toUri
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
@@ -40,10 +43,13 @@ import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.socks.toUri
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.trojan.toUri
+import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
+import io.nekohasekai.sagernet.fmt.trojan_go.toUri
 import io.nekohasekai.sagernet.fmt.v2ray.VLESSBean
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.fmt.v2ray.toUri
 import io.nekohasekai.sagernet.ktx.Logs
+import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ui.profile.*
 
 @Entity(tableName = "proxy_entities", indices = [
@@ -64,6 +70,8 @@ data class ProxyEntity(
     var vmessBean: VMessBean? = null,
     var vlessBean: VLESSBean? = null,
     var trojanBean: TrojanBean? = null,
+    var trojanGoBean: TrojanGoBean? = null,
+    var chainBean: ChainBean? = null,
 ) : Parcelable {
 
     @Ignore
@@ -73,7 +81,6 @@ data class ProxyEntity(
     @Ignore
     @Transient
     var stats: TrafficStats? = null
-
 
     constructor(parcel: Parcel) : this(
         parcel.readLong(),
@@ -93,6 +100,8 @@ data class ProxyEntity(
             4 -> vlessBean = KryoConverters.vlessDeserialize(byteArray)
             5 -> trojanBean = KryoConverters.trojanDeserialize(byteArray)
             6 -> httpBean = KryoConverters.httpDeserialize(byteArray)
+            7 -> trojanGoBean = KryoConverters.trojanGoDeserialize(byteArray)
+            7 -> chainBean = KryoConverters.chainDeserialize(byteArray)
         }
     }
 
@@ -109,9 +118,12 @@ data class ProxyEntity(
         parcel.writeByteArray(byteArray)
     }
 
+    companion object {
+        val chainName by lazy { app.getString(R.string.proxy_chain) }
+    }
+
     fun displayType(): String {
         return when (type) {
-            //     2 -> "VMess"
             0 -> "SOCKS5"
             1 -> "Shadowsocks"
             2 -> "ShadowsocksR"
@@ -119,13 +131,23 @@ data class ProxyEntity(
             4 -> "VLESS"
             5 -> "Trojan"
             6 -> if (requireHttp().tls) "HTTPS" else "HTTP"
+            7 -> "Trojan-Go"
+            8 -> chainName
             else -> "Undefined type $type"
         }
     }
 
     fun displayName(): String {
-        return requireBean().name.takeIf { !it.isNullOrBlank() }
-            ?: "${requireBean().serverAddress}:${requireBean().serverPort}"
+        return requireBean().displayName()
+    }
+
+    fun urlFixed(): String {
+        val bean = requireBean()
+        return if (Validator.isIpv6(bean.serverAddress)) {
+            "[${bean.serverAddress}]:${bean.serverPort}"
+        } else {
+            "${bean.serverAddress}:${bean.serverPort}"
+        }
     }
 
     fun requireBean(): AbstractBean {
@@ -138,6 +160,8 @@ data class ProxyEntity(
             4 -> vlessBean ?: error("Null vless node")
             5 -> trojanBean ?: error("Null trojan node")
             6 -> httpBean ?: error("Null http node")
+            7 -> trojanGoBean ?: error("Null trojan-go node")
+            8 -> chainBean ?: error("Null chain bean")
             else -> error("Undefined type $type")
         }
     }
@@ -151,6 +175,7 @@ data class ProxyEntity(
             4 -> requireVLESS().toUri(true)
             5 -> requireTrojan().toUri()
             6 -> requireHttp().toUri()
+            7 -> requireTrojanGo().toUri()
             else -> error("Undefined type $type")
         }
     }
@@ -164,6 +189,19 @@ data class ProxyEntity(
             return true
         }
         if (bean.method !in methodsV2fly) return true
+        return false
+    }
+
+    fun useXray(): Boolean {
+        when (val bean = requireBean()) {
+            is VLESSBean -> {
+                if (bean.security == "xtls") return true
+            }
+            is TrojanBean -> {
+                if (bean.security == "xtls") return true
+            }
+        }
+
         return false
     }
 
@@ -197,6 +235,14 @@ data class ProxyEntity(
                 type = 5
                 trojanBean = bean
             }
+            is TrojanGoBean -> {
+                type = 7
+                trojanGoBean = bean
+            }
+            is ChainBean -> {
+                type = 8
+                chainBean = bean
+            }
             else -> error("Undefined type $type")
         }
     }
@@ -205,11 +251,13 @@ data class ProxyEntity(
     fun requireSS() = requireBean() as ShadowsocksBean
     fun requireSSR() = requireBean() as ShadowsocksRBean
     fun requireVMess() = requireBean() as VMessBean
-    fun requireVLESS() = requireBean() as VMessBean
+    fun requireVLESS() = requireBean() as VLESSBean
     fun requireTrojan() = requireBean() as TrojanBean
     fun requireHttp() = requireBean() as HttpBean
+    fun requireTrojanGo() = requireBean() as TrojanGoBean
+    fun requireChain() = requireBean() as ChainBean
 
-    fun settingIntent(ctx: Context): Intent {
+    fun settingIntent(ctx: Context, isSubscription: Boolean): Intent {
         return Intent(ctx, when (type) {
             0 -> SocksSettingsActivity::class.java
             1 -> ShadowsocksSettingsActivity::class.java
@@ -218,9 +266,12 @@ data class ProxyEntity(
             4 -> VLESSSettingsActivity::class.java
             5 -> TrojanSettingsActivity::class.java
             6 -> HttpSettingsActivity::class.java
+            7 -> TrojanGoSettingsActivity::class.java
+            8 -> ChainSettingsActivity::class.java
             else -> throw IllegalArgumentException()
         }).apply {
             putExtra(ProfileSettingsActivity.EXTRA_PROFILE_ID, id)
+            putExtra(ProfileSettingsActivity.EXTRA_IS_SUBSCRIPTION, isSubscription)
         }
     }
 
@@ -232,6 +283,9 @@ data class ProxyEntity(
 
         @Query("SELECT * FROM proxy_entities WHERE groupId = :groupId ORDER BY userOrder")
         fun getByGroup(groupId: Long): List<ProxyEntity>
+
+        @Query("SELECT * FROM proxy_entities WHERE id in (:proxyIds)")
+        fun getEntities(proxyIds: List<Long>): List<ProxyEntity>
 
         @Query("SELECT COUNT(*) FROM proxy_entities WHERE groupId = :groupId")
         fun countByGroup(groupId: Long): Long
@@ -249,10 +303,10 @@ data class ProxyEntity(
         fun deleteByGroup(vararg groupId: Long)
 
         @Delete
-        fun deleteProxy(vararg proxy: ProxyEntity)
+        fun deleteProxy(vararg proxy: ProxyEntity): Int
 
         @Update
-        fun updateProxy(vararg proxy: ProxyEntity)
+        fun updateProxy(vararg proxy: ProxyEntity): Int
 
         @Insert
         fun addProxy(proxy: ProxyEntity): Long
@@ -267,7 +321,7 @@ data class ProxyEntity(
         return 0
     }
 
-    companion object CREATOR : Parcelable.Creator<ProxyEntity> {
+    object CREATOR : Parcelable.Creator<ProxyEntity> {
         override fun createFromParcel(parcel: Parcel): ProxyEntity {
             return ProxyEntity(parcel)
         }

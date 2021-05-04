@@ -9,7 +9,6 @@
 
     <string name="misc">雜項</string>
     <string name="app_version">版本</string>
-    <string name="v2ray_version">版本 (v2ray-core)</string>
     <string name="logcat">匯出 debug 所需資訊</string>
     <string name="logcat_summary">這種非常有用啊(^O^)／</string>
 
@@ -75,6 +74,7 @@
     <string name="speed_interval">速度通知更新間隔</string>
 
     <string name="traffic">%1$s↑ %2$s↓</string>
+    <string name="speed_detail">代理： %1$s↑ %2$s↓\n直連： %3$s↑ %4$s↓</string>
     <string name="stat_summary">送出：\t\t\t\t\t%3$s\t↑\t%1$s\n接收：\t%4$s\t↓\t%2$s</string>
     <string name="speed">%s/s</string>
     <string name="connection_test_pending">檢查連線能力</string>
@@ -102,8 +102,6 @@
     <string name="alter_id">替代 ID</string>
     <string name="network">網路</string>
     <string name="header_type">標頭類型</string>
-    <string name="request_host">請求主機</string>
-    <string name="path">Path / Key / Seed / ServiceName</string>
     <string name="tls">使用 TLS</string>
     <string name="sni">伺服器名稱指示</string>
     <string name="encryption">加密</string>
@@ -164,13 +162,6 @@
     <string name="share">分享</string>
     <string name="add_profile">新增設定檔</string>
     <string name="action_profile">設定檔</string>
-    <string name="action_socks">SOCKS</string>
-    <string name="action_http">HTTP</string>
-    <string name="action_shadowsocks">Shadowsocks</string>
-    <string name="action_shadowsocksr">ShadowsocksR</string>
-    <string name="action_vmess">VMess</string>
-    <string name="action_vless">VLESS</string>
-    <string name="action_trojan">Trojan</string>
 
     <string name="action_create_group">空白群組</string>
     <string name="action_from_link">來自訂閱</string>

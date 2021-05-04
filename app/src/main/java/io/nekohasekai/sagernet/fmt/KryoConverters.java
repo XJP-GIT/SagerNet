@@ -31,11 +31,13 @@ import java.io.ByteArrayOutputStream;
 
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.ArrayUtil;
+import io.nekohasekai.sagernet.fmt.chain.ChainBean;
 import io.nekohasekai.sagernet.fmt.http.HttpBean;
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean;
 import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean;
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean;
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean;
+import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean;
 import io.nekohasekai.sagernet.fmt.v2ray.VLESSBean;
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean;
 import io.nekohasekai.sagernet.ktx.KryosKt;
@@ -122,5 +124,18 @@ public class KryoConverters {
         if (ArrayUtil.isEmpty(bytes)) return null;
         return deserialize(new TrojanBean(), bytes);
     }
+
+    @TypeConverter
+    public static TrojanGoBean trojanGoDeserialize(byte[] bytes) {
+        if (ArrayUtil.isEmpty(bytes)) return null;
+        return deserialize(new TrojanGoBean(), bytes);
+    }
+
+    @TypeConverter
+    public static ChainBean chainDeserialize(byte[] bytes) {
+        if (ArrayUtil.isEmpty(bytes)) return null;
+        return deserialize(new ChainBean(), bytes);
+    }
+
 
 }

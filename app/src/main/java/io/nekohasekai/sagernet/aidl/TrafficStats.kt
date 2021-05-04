@@ -27,14 +27,18 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data class TrafficStats(
     // Bytes per second
-    var txRate: Long = 0L,
-    var rxRate: Long = 0L,
+    var txRateProxy: Long = 0L,
+    var rxRateProxy: Long = 0L,
+    var txRateDirect: Long = 0L,
+    var rxRateDirect: Long = 0L,
 
     // Bytes for the current session
+    // Outbound "bypass" usage is not counted
     var txTotal: Long = 0L,
     var rxTotal: Long = 0L,
 ) : Parcelable {
     operator fun plus(other: TrafficStats) = TrafficStats(
-        txRate + other.txRate, rxRate + other.rxRate,
+        txRateProxy + other.txRateProxy, rxRateProxy + other.rxRateProxy,
+        txRateDirect + other.txRateDirect, rxRateDirect + other.rxRateDirect,
         txTotal + other.txTotal, rxTotal + other.rxTotal)
 }
